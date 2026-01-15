@@ -248,6 +248,25 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     setBlocks((prev) => prev.filter((b) => b.id !== blockId));
   }, []);
 
+  const handleClearBlocks = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/clear-content-blocks', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        console.error('Failed to clear blocks');
+        return;
+      }
+
+      setBlocks([]);
+      lastSavedRef.current = { title, description, blocks: [] };
+      setSaveStatus('saved');
+    } catch (error) {
+      console.error('Failed to clear blocks:', error);
+    }
+  }, [title, description]);
+
   const handleEditBlock = useCallback((block: ContentBlock) => {
     setEditingBlock(block);
   }, []);
@@ -378,6 +397,14 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
               >
                 <Video className="w-4 h-4 mr-2" />
                 Vimeo
+              </Button>
+              <Button
+                onClick={handleClearBlocks}
+                variant="outline"
+                size="sm"
+                className="border-red-600 text-red-300 hover:bg-red-900/30"
+              >
+                Clear Blocks
               </Button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
               <Link href={`/${page.slug}`} target="_blank">
