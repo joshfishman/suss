@@ -379,8 +379,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         </div>
       )}
 
-      {/* Admin toolbar - z-[60] to be above site header (z-50) */}
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-black text-white">
+      {/* Admin toolbar - fixed bottom to keep public layout intact */}
+      <div className="fixed bottom-0 left-0 right-0 z-[60] bg-black text-white">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -448,43 +448,44 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         </div>
       </div>
 
-      {/* Site header - admin toolbar overlays it at top */}
+      {/* Site header - matches public layout */}
       <SiteHeader />
 
-      {/* Page hero - editable (pt-32 accounts for fixed header + admin toolbar) */}
-      <section className="pt-32 pb-20 px-8 bg-white">
-        <div className="container mx-auto max-w-4xl">
-          <h1
-            ref={titleRef}
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => setTitle(e.currentTarget.textContent || '')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                e.currentTarget.blur();
-              }
-            }}
-            className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
-            data-placeholder="Page Title"
-          >
-            {title}
-          </h1>
-          <p
-            ref={descriptionRef}
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => setDescription(e.currentTarget.textContent || '')}
-            className="text-lg md:text-xl font-light text-gray-500 leading-relaxed max-w-2xl outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
-            data-placeholder="Click to add a description..."
-          >
-            {description || ''}
-          </p>
-        </div>
-      </section>
+      <main className="pt-20">
+        {/* Page hero - editable (matches public styling) */}
+        <section className="py-20 px-8">
+          <div className="container mx-auto max-w-4xl">
+            <h1
+              ref={titleRef}
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={(e) => setTitle(e.currentTarget.textContent || '')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+              className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
+              data-placeholder="Page Title"
+            >
+              {title}
+            </h1>
+            <p
+              ref={descriptionRef}
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={(e) => setDescription(e.currentTarget.textContent || '')}
+              className="text-lg md:text-xl font-light text-muted-foreground leading-relaxed max-w-2xl outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
+              data-placeholder="Click to add a description..."
+            >
+              {description || ''}
+            </p>
+          </div>
+        </section>
 
-      {/* Content grid */}
-      <div className="container mx-auto px-8 pb-20" ref={containerRef}>
+        {/* Content grid */}
+        <div className="container mx-auto px-8 pb-24" ref={containerRef}>
         {blocks.length === 0 ? (
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
             <p className="text-gray-400 mb-4">Drag images here or use the toolbar to add content</p>
@@ -547,7 +548,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             ))}
           </GridLayout>
         )}
-      </div>
+        </div>
+      </main>
 
       {/* Site footer - same as front end */}
       <SiteFooter />
