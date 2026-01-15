@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { AdminPageEditor } from '@/components/admin/admin-page-editor';
+import { PageEditor } from '@/components/admin/page-editor';
 
 async function EditorContent({ slug }: { slug: string }) {
   const supabase = await createClient();
@@ -28,7 +28,7 @@ async function EditorContent({ slug }: { slug: string }) {
     .eq('page_id', page.id)
     .order('sort_order', { ascending: true });
 
-  return <AdminPageEditor page={page} initialBlocks={blocks || []} />;
+  return <PageEditor page={page} initialBlocks={blocks || []} />;
 }
 
 export default async function AdminPageEdit({
@@ -39,10 +39,8 @@ export default async function AdminPageEdit({
   const { slug } = await params;
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-        <EditorContent slug={slug} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>}>
+      <EditorContent slug={slug} />
+    </Suspense>
   );
 }

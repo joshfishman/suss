@@ -1,0 +1,415 @@
+'use client';
+
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useDropzone } from 'react-dropzone';
+import GridLayout, { Layout, LayoutItem, horizontalCompactor } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+import { Page, ContentBlock, ImageContent, VimeoContent, TextContent } from '@/lib/types/content';
+import { BlockRenderer } from '@/components/content-blocks/block-renderer';
+import { BlockEditorModal } from './block-editor-modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Save, Trash2, Edit, Plus, Video, Type, Image as ImageIcon } from 'lucide-react';
+import Link from 'next/link';
+
+interface PageEditorProps {
+  page: Page;
+  initialBlocks: ContentBlock[];
+}
+
+export function PageEditor({ page, initialBlocks }: PageEditorProps) {
+  const router = useRouter();
+  const [blocks, setBlocks] = useState<ContentBlock[]>(initialBlocks);
+  const [title, setTitle] = useState(page.title);
+  const [description, setDescription] = useState(page.description || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
+  const [containerWidth, setContainerWidth] = useState(1200);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  const layout = blocks.map((block) => ({
+    i: block.layout.i,
+    x: block.layout.x,
+    y: block.layout.y,
+    w: block.layout.w,
+    h: block.layout.h,
+    minW: 1,
+    maxW: 4,
+    minH: 1,
+  }));
+
+  const handleLayoutChange = useCallback((newLayout: Layout) => {
+    setBlocks((prevBlocks) =>
+      prevBlocks.map((block) => {
+        const layoutItem = newLayout.find((l: LayoutItem) => l.i === block.layout.i);
+        if (layoutItem) {
+          return {
+            ...block,
+            layout: {
+              ...block.layout,
+              x: layoutItem.x,
+              y: layoutItem.y,
+              w: layoutItem.w,
+              h: layoutItem.h,
+            },
+          };
+        }
+        return block;
+      })
+    );
+  }, []);
+
+  const handleAddBlock = useCallback((type: 'image' | 'vimeo' | 'text') => {
+    const existingMaxY = blocks.length > 0 
+      ? Math.max(...blocks.map(b => b.layout.y + b.layout.h))
+      : 0;
+    
+    // Find next available x position in the current row
+    const currentRowBlocks = blocks.filter(b => b.layout.y === existingMaxY - 1);
+    const usedWidth = currentRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
+    const nextX = usedWidth < 4 ? usedWidth : 0;
+    const nextY = usedWidth < 4 && blocks.length > 0 ? existingMaxY - 1 : existingMaxY;
+
+    const newBlock: ContentBlock = {
+      id: `temp-${Date.now()}`,
+      page_id: page.id,
+      block_type: type,
+      content: type === 'image' 
+        ? { url: '', alt: '', caption: '' }
+        : type === 'vimeo'
+        ? { vimeo_id: '', title: '', caption: '' }
+        : { html: 'Click to edit text', style: 'paragraph' },
+      layout: {
+        i: `block-${Date.now()}`,
+        x: nextX,
+        y: nextY,
+        w: 1,
+        h: type === 'text' ? 2 : 3,
+      },
+      sort_order: blocks.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setBlocks((prev) => [...prev, newBlock]);
+  }, [page.id, blocks]);
+
+  const handleDeleteBlock = useCallback((blockId: string) => {
+    setBlocks((prev) => prev.filter((b) => b.id !== blockId));
+  }, []);
+
+  const handleEditBlock = useCallback((block: ContentBlock) => {
+    setEditingBlock(block);
+  }, []);
+
+  const handleSaveBlock = useCallback((updatedBlock: ContentBlock) => {
+    setBlocks((prev) =>
+      prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b))
+    );
+  }, []);
+
+  // Handle file drop for images
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    setIsDraggingFile(false);
+    
+    for (const file of acceptedFiles) {
+      if (!file.type.startsWith('image/')) continue;
+      
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Find next position
+          const existingMaxY = blocks.length > 0 
+            ? Math.max(...blocks.map(b => b.layout.y + b.layout.h))
+            : 0;
+          
+          const newBlock: ContentBlock = {
+            id: `temp-${Date.now()}-${Math.random()}`,
+            page_id: page.id,
+            block_type: 'image',
+            content: { url: data.url, alt: file.name, caption: '' },
+            layout: {
+              i: `block-${Date.now()}-${Math.random()}`,
+              x: 0,
+              y: existingMaxY,
+              w: 2,
+              h: 3,
+            },
+            sort_order: blocks.length,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          
+          setBlocks((prev) => [...prev, newBlock]);
+        }
+      } catch (error) {
+        console.error('Upload failed:', error);
+      }
+    }
+  }, [blocks, page.id]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'] },
+    noClick: true,
+    onDragEnter: () => setIsDraggingFile(true),
+    onDragLeave: () => setIsDraggingFile(false),
+  });
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Save page settings
+      await fetch(`/api/pages/${page.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description }),
+      });
+
+      // Delete all existing blocks
+      for (const block of initialBlocks) {
+        if (!block.id.startsWith('temp-')) {
+          await fetch(`/api/content-blocks/${block.id}`, {
+            method: 'DELETE',
+          });
+        }
+      }
+
+      // Create new blocks
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+        await fetch('/api/content-blocks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            page_id: page.id,
+            block_type: block.block_type,
+            content: block.content,
+            layout: block.layout,
+            sort_order: i,
+          }),
+        });
+      }
+
+      router.refresh();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white" {...getRootProps()}>
+      <input {...getInputProps()} />
+      
+      {/* Drag overlay */}
+      {isDragActive && (
+        <div className="fixed inset-0 bg-blue-500/20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-8 shadow-xl">
+            <ImageIcon className="w-16 h-16 mx-auto mb-4 text-blue-500" />
+            <p className="text-xl font-medium">Drop images here</p>
+          </div>
+        </div>
+      )}
+
+      {/* Admin toolbar */}
+      <div className="fixed top-0 left-0 right-0 z-40 bg-black text-white">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/admin">
+                <Button variant="ghost" size="sm" className="text-white hover:bg-gray-800">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+              </Link>
+              <span className="text-sm text-gray-400">Editing: {page.title}</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => handleAddBlock('image')}
+                variant="outline"
+                size="sm"
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Image
+              </Button>
+              <Button
+                onClick={() => handleAddBlock('vimeo')}
+                variant="outline"
+                size="sm"
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                <Video className="w-4 h-4 mr-2" />
+                Vimeo
+              </Button>
+              <Button
+                onClick={() => handleAddBlock('text')}
+                variant="outline"
+                size="sm"
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                <Type className="w-4 h-4 mr-2" />
+                Text
+              </Button>
+              <div className="w-px h-6 bg-gray-700 mx-2" />
+              <Link href={`/${page.slug}`} target="_blank">
+                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-800">
+                  Preview
+                </Button>
+              </Link>
+              <Button onClick={handleSave} disabled={isSaving} size="sm" className="bg-white text-black hover:bg-gray-200">
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Simulated page header */}
+      <header className="bg-black pt-16">
+        <nav className="container mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-extralight tracking-widest text-white uppercase">
+              the Suss
+            </span>
+            <div className="flex gap-12">
+              <span className="text-sm font-light tracking-wide uppercase text-white/60">Home</span>
+              <span className="text-sm font-light tracking-wide uppercase text-white/60">About</span>
+              <span className="text-sm font-light tracking-wide uppercase text-white/60">Projects</span>
+            </div>
+          </div>
+        </nav>
+      </header>
+
+      {/* Page hero - editable */}
+      <section className="py-20 px-8 bg-white">
+        <div className="container mx-auto max-w-4xl">
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 border-none p-0 h-auto bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+            placeholder="Page Title"
+          />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="text-lg md:text-xl font-light text-gray-500 leading-relaxed max-w-2xl w-full border-none p-0 bg-transparent resize-none focus:outline-none"
+            placeholder="Page description..."
+            rows={3}
+          />
+        </div>
+      </section>
+
+      {/* Content grid */}
+      <div className="container mx-auto px-8 pb-20" ref={containerRef}>
+        {blocks.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+            <p className="text-gray-400 mb-4">Drag images here or use the toolbar to add content</p>
+            <div className="flex justify-center gap-2">
+              <Button onClick={() => handleAddBlock('image')} variant="outline" size="sm">
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Add Image
+              </Button>
+              <Button onClick={() => handleAddBlock('vimeo')} variant="outline" size="sm">
+                <Video className="w-4 h-4 mr-2" />
+                Add Vimeo
+              </Button>
+              <Button onClick={() => handleAddBlock('text')} variant="outline" size="sm">
+                <Type className="w-4 h-4 mr-2" />
+                Add Text
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <GridLayout
+            className="layout"
+            layout={layout}
+            width={containerWidth}
+            onLayoutChange={handleLayoutChange}
+            compactor={horizontalCompactor}
+            gridConfig={{
+              cols: 4,
+              rowHeight: 150,
+              margin: [16, 16] as const,
+              containerPadding: [0, 0] as const,
+            }}
+            dragConfig={{
+              enabled: true,
+            }}
+            resizeConfig={{
+              enabled: true,
+            }}
+          >
+            {blocks.map((block) => (
+              <div
+                key={block.layout.i}
+                className="relative rounded-lg overflow-hidden bg-gray-100 group"
+              >
+                <BlockRenderer block={block} isEditing />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditBlock(block);
+                      }}
+                      className="bg-white text-black hover:bg-gray-100"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteBlock(block.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </GridLayout>
+        )}
+      </div>
+
+      {/* Block editor modal */}
+      {editingBlock && (
+        <BlockEditorModal
+          block={editingBlock}
+          onSave={handleSaveBlock}
+          onClose={() => setEditingBlock(null)}
+        />
+      )}
+    </div>
+  );
+}
