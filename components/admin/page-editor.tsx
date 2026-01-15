@@ -12,6 +12,34 @@ import { BlockEditorModal } from './block-editor-modal';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trash2, Edit, Video, Type, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { SiteHeader } from '@/components/site-header';
+import { SiteFooter } from '@/components/site-footer';
+
+// Helper to get image dimensions
+function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+// Convert image dimensions to grid units (maintaining aspect ratio)
+function calculateGridSize(imgWidth: number, imgHeight: number, maxCols: number = 4, rowHeight: number = 50): { w: number; h: number } {
+  const aspectRatio = imgWidth / imgHeight;
+  
+  // Start with 2 columns as default width
+  const defaultWidth = 2;
+  // Calculate height based on aspect ratio
+  // Each column is roughly 25% of container, assume container ~1200px = 300px per column
+  const colWidth = 300;
+  const pixelWidth = defaultWidth * colWidth;
+  const pixelHeight = pixelWidth / aspectRatio;
+  const gridHeight = Math.max(2, Math.round(pixelHeight / rowHeight));
+  
+  return { w: defaultWidth, h: gridHeight };
+}
 
 interface PageEditorProps {
   page: Page;
@@ -179,7 +207,11 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     newItem: LayoutItem,
     placeholder: LayoutItem
   ) => {
-    const ratio = aspectRatios.current[newItem.i];
+    // Find the block to check its type
+    const block = blocks.find(b => b.layout.i === newItem.i);
+    
+    // Use stored ratio, but enforce 16:9 for Vimeo blocks
+    const ratio = block?.block_type === 'vimeo' ? 16/9 : aspectRatios.current[newItem.i];
     if (!ratio) return;
 
     // Determine if width or height changed more
@@ -188,26 +220,36 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
     if (widthChanged) {
       // Width changed, adjust height to maintain ratio
-      const newHeight = Math.max(1, Math.round(newItem.w / ratio));
+      // For 16:9: ratio = 1.78, so height = width / 1.78
+      // With 50px rows and ~300px columns: 2 cols = 600px, 600/1.78 = 337px = ~7 rows
+      const newHeight = Math.max(2, Math.round(newItem.w / ratio * 6)); // Scale factor for grid units
       newItem.h = newHeight;
       placeholder.h = newHeight;
     } else if (heightChanged) {
       // Height changed, adjust width to maintain ratio
-      const newWidth = Math.min(4, Math.max(1, Math.round(newItem.h * ratio)));
+      const newWidth = Math.min(4, Math.max(1, Math.round(newItem.h * ratio / 6)));
       newItem.w = newWidth;
       placeholder.w = newWidth;
     }
-  }, []);
+  }, [blocks]);
 
-  // Update aspect ratio when resize stops
+  // Update aspect ratio when resize stops (but keep Vimeo at 16:9)
   const handleResizeStop = useCallback((
     layout: Layout,
     oldItem: LayoutItem,
     newItem: LayoutItem
   ) => {
-    // Update the stored aspect ratio after resize
-    aspectRatios.current[newItem.i] = newItem.w / newItem.h;
-  }, []);
+    // Find the block to check its type
+    const block = blocks.find(b => b.layout.i === newItem.i);
+    
+    // Vimeo blocks always stay at 16:9, don't update their ratio
+    if (block?.block_type === 'vimeo') {
+      aspectRatios.current[newItem.i] = 16/9;
+    } else {
+      // For other blocks, update the stored aspect ratio
+      aspectRatios.current[newItem.i] = newItem.w / newItem.h;
+    }
+  }, [blocks]);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo' | 'text') => {
     // Find first row (y=0) and calculate used width there
@@ -219,11 +261,27 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     const nextY = usedWidth < 4 ? 0 : (blocks.length > 0 ? Math.max(...blocks.map(b => b.layout.y + b.layout.h)) : 0);
 
     const blockId = `block-${Date.now()}`;
-    const blockW = 1;
-    const blockH = type === 'text' ? 3 : 6; // 6 rows = 300px for images/videos
     
-    // Set initial aspect ratio
-    aspectRatios.current[blockId] = blockW / blockH;
+    // Set dimensions based on block type
+    // Vimeo always 16:9, text is compact, images start square-ish
+    let blockW: number;
+    let blockH: number;
+    
+    if (type === 'vimeo') {
+      // 16:9 ratio: 2 columns wide, ~7 rows tall (600px / 1.78 / 50px ≈ 7)
+      blockW = 2;
+      blockH = 7;
+    } else if (type === 'text') {
+      blockW = 1;
+      blockH = 3;
+    } else {
+      // Image - start with placeholder size, will be updated when image loads
+      blockW = 2;
+      blockH = 6;
+    }
+    
+    // Set initial aspect ratio (16/9 for vimeo, calculated for others)
+    aspectRatios.current[blockId] = type === 'vimeo' ? 16/9 : blockW / blockH;
 
     const newBlock: ContentBlock = {
       id: `temp-${Date.now()}`,
@@ -283,21 +341,34 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         if (response.ok) {
           const data = await response.json();
           
+          // Get image dimensions to calculate proper aspect ratio
+          let blockW = 2;
+          let blockH = 6;
+          let imgAspectRatio = blockW / blockH;
+          
+          try {
+            const dimensions = await getImageDimensions(data.url);
+            const gridSize = calculateGridSize(dimensions.width, dimensions.height);
+            blockW = gridSize.w;
+            blockH = gridSize.h;
+            imgAspectRatio = dimensions.width / dimensions.height;
+          } catch (e) {
+            console.warn('Could not get image dimensions, using defaults');
+          }
+          
           // Calculate position: place side by side on first row (y=0)
           const allBlocks = [...blocks, ...newBlocks];
           const firstRowBlocks = allBlocks.filter(b => b.layout.y === 0);
           const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
           
           // If there's space in first row, add there; otherwise start new row
-          const nextX = usedWidth < 4 ? usedWidth : 0;
-          const nextY = usedWidth < 4 ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
+          const nextX = usedWidth + blockW <= 4 ? usedWidth : 0;
+          const nextY = usedWidth + blockW <= 4 ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
           
           const blockId = `block-${Date.now()}-${Math.random()}`;
-          const blockW = 1;
-          const blockH = 6;
           
-          // Set initial aspect ratio for the new block
-          aspectRatios.current[blockId] = blockW / blockH;
+          // Store the actual image aspect ratio for resize locking
+          aspectRatios.current[blockId] = imgAspectRatio;
           
           const newBlock: ContentBlock = {
             id: `temp-${Date.now()}-${Math.random()}`,
@@ -351,8 +422,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         </div>
       )}
 
-      {/* Admin toolbar */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-black text-white">
+      {/* Admin toolbar - z-[60] to be above site header (z-50) */}
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-black text-white">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -421,24 +492,11 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         </div>
       </div>
 
-      {/* Simulated page header */}
-      <header className="bg-black pt-16">
-        <nav className="container mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-extralight tracking-widest text-white uppercase">
-              the Suss
-            </span>
-            <div className="flex gap-12">
-              <span className="text-sm font-light tracking-wide uppercase text-white/60">Home</span>
-              <span className="text-sm font-light tracking-wide uppercase text-white/60">About</span>
-              <span className="text-sm font-light tracking-wide uppercase text-white/60">Projects</span>
-            </div>
-          </div>
-        </nav>
-      </header>
+      {/* Site header - admin toolbar overlays it at top */}
+      <SiteHeader />
 
-      {/* Page hero - editable */}
-      <section className="py-20 px-8 bg-white">
+      {/* Page hero - editable (pt-32 accounts for fixed header + admin toolbar) */}
+      <section className="pt-32 pb-20 px-8 bg-white">
         <div className="container mx-auto max-w-4xl">
           <h1
             ref={titleRef}
@@ -548,6 +606,9 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
           </GridLayout>
         )}
       </div>
+
+      {/* Site footer - same as front end */}
+      <SiteFooter />
 
       {/* Block editor modal */}
       {editingBlock && (
