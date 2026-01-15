@@ -62,6 +62,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
+  const isSavingSyncRef = useRef(false);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -78,6 +79,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const performSave = useCallback(async () => {
     setSaveStatus('saving');
     setIsSaving(true);
+    isSavingSyncRef.current = true;
     
     try {
       // Save page settings
@@ -134,7 +136,9 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         }
       }
 
-      setBlocks(updatedBlocks);
+      if (blocks.some((block) => block.id.startsWith('temp-'))) {
+        setBlocks(updatedBlocks);
+      }
 
       lastSavedRef.current = { title, description, blocks: updatedBlocks };
       setSaveStatus('saved');
@@ -143,11 +147,16 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       setSaveStatus('unsaved');
     } finally {
       setIsSaving(false);
+      // Allow autosave after this cycle completes
+      setTimeout(() => {
+        isSavingSyncRef.current = false;
+      }, 0);
     }
   }, [title, description, blocks, page.slug, page.id]);
 
   // Trigger auto-save on changes
   useEffect(() => {
+    if (isSavingSyncRef.current) return;
     const hasChanges = 
       title !== lastSavedRef.current.title ||
       description !== lastSavedRef.current.description ||
