@@ -62,6 +62,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
+  const lastAttemptRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
   const isSavingSyncRef = useRef(false);
 
   useEffect(() => {
@@ -141,10 +142,13 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       }
 
       lastSavedRef.current = { title, description, blocks: updatedBlocks };
+      lastAttemptRef.current = { title, description, blocks: updatedBlocks };
       setSaveStatus('saved');
     } catch (error) {
       console.error('Save failed:', error);
       setSaveStatus('unsaved');
+      // Prevent retry loop until user makes another change
+      lastAttemptRef.current = { title, description, blocks };
     } finally {
       setIsSaving(false);
       // Allow autosave after this cycle completes
@@ -158,9 +162,9 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   useEffect(() => {
     if (isSavingSyncRef.current) return;
     const hasChanges = 
-      title !== lastSavedRef.current.title ||
-      description !== lastSavedRef.current.description ||
-      JSON.stringify(blocks) !== JSON.stringify(lastSavedRef.current.blocks);
+      title !== lastAttemptRef.current.title ||
+      description !== lastAttemptRef.current.description ||
+      JSON.stringify(blocks) !== JSON.stringify(lastAttemptRef.current.blocks);
 
     if (hasChanges) {
       setSaveStatus('unsaved');
@@ -170,6 +174,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       }
       
       saveTimeoutRef.current = setTimeout(() => {
+        lastAttemptRef.current = { title, description, blocks };
         performSave();
       }, 1500); // Auto-save after 1.5 seconds of inactivity
     }
