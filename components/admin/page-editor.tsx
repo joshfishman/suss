@@ -65,6 +65,26 @@ function widthForRatio(h: number, ratio: number, containerWidth: number) {
   return Math.min(GRID_COLS, Math.max(1, Math.round((targetWidthPx + marginX) / (colWidth + marginX))));
 }
 
+function normalizeInitialBlocks(blocks: ContentBlock[]) {
+  const seen = new Set<string>();
+  return blocks.map((block) => {
+    let key = block.layout?.i || block.id || createBlockId('block');
+    if (seen.has(key)) {
+      key = createBlockId('block');
+    }
+    seen.add(key);
+    return key === block.layout?.i
+      ? block
+      : {
+          ...block,
+          layout: {
+            ...block.layout,
+            i: key,
+          },
+        };
+  });
+}
+
 interface PageEditorProps {
   page: Page;
   initialBlocks: ContentBlock[];
@@ -72,7 +92,7 @@ interface PageEditorProps {
 
 export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const router = useRouter();
-  const [blocks, setBlocks] = useState<ContentBlock[]>(initialBlocks);
+  const [blocks, setBlocks] = useState<ContentBlock[]>(() => normalizeInitialBlocks(initialBlocks));
   const [title, setTitle] = useState(page.title);
   const [description, setDescription] = useState(page.description || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -85,7 +105,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
-  const hasNormalizedKeysRef = useRef(false);
   const normalizedMediaRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -185,27 +204,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   // Store aspect ratios for each block (width/height in grid units)
   const aspectRatios = useRef<Record<string, number>>({});
   
-  // Normalize duplicate layout keys on first load
-  useEffect(() => {
-    if (hasNormalizedKeysRef.current) return;
-    hasNormalizedKeysRef.current = true;
-
-    setBlocks((prev) => {
-      const seen = new Set<string>();
-      let changed = false;
-      const next = prev.map((block) => {
-        let key = block.layout.i || block.id;
-        if (!key || seen.has(key)) {
-          key = createBlockId('block');
-          changed = true;
-        }
-        seen.add(key);
-        return key === block.layout.i ? block : { ...block, layout: { ...block.layout, i: key } };
-      });
-      return changed ? next : prev;
-    });
-  }, []);
-
   // Initialize aspect ratios for existing blocks
   useEffect(() => {
     blocks.forEach((block) => {
@@ -272,35 +270,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       return changed ? next : prev;
     });
   }, [containerWidth]);
-
-  // Ensure all layout keys are unique (fix old duplicated keys)
-  useEffect(() => {
-    setBlocks((prev) => {
-      const seen = new Set<string>();
-      let changed = false;
-
-      const next = prev.map((block) => {
-        const currentKey = block.layout.i;
-        if (!seen.has(currentKey)) {
-          seen.add(currentKey);
-          return block;
-        }
-
-        // Duplicate key found, generate a new one
-        const newKey = createBlockId('block');
-        changed = true;
-        return {
-          ...block,
-          layout: {
-            ...block.layout,
-            i: newKey,
-          },
-        };
-      });
-
-      return changed ? next : prev;
-    });
-  }, []);
 
   const layout = blocks.map((block) => ({
     i: block.layout.i,
