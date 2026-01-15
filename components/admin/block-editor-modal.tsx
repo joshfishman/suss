@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ContentBlock, ImageContent, VimeoContent, TextContent } from '@/lib/types/content';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,9 @@ interface BlockEditorModalProps {
 export function BlockEditorModal({ block, onSave, onClose }: BlockEditorModalProps) {
   const [content, setContent] = useState(block.content);
   const [uploading, setUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upload' | 'existing'>('upload');
+  const [existingImages, setExistingImages] = useState<{ url: string; name: string }[]>([]);
+  const [loadingImages, setLoadingImages] = useState(false);
 
   const onDrop = async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0 || block.block_type !== 'image') return;
@@ -46,6 +49,29 @@ export function BlockEditorModal({ block, onSave, onClose }: BlockEditorModalPro
     maxFiles: 1,
   });
 
+  useEffect(() => {
+    if (block.block_type !== 'image') return;
+    if (activeTab !== 'existing') return;
+    if (existingImages.length > 0) return;
+
+    const loadImages = async () => {
+      setLoadingImages(true);
+      try {
+        const response = await fetch('/api/admin/list-images');
+        const data = await response.json();
+        if (response.ok && data.images) {
+          setExistingImages(data.images);
+        }
+      } catch (error) {
+        console.error('Failed to load images:', error);
+      } finally {
+        setLoadingImages(false);
+      }
+    };
+
+    loadImages();
+  }, [activeTab, block.block_type, existingImages.length]);
+
   const handleSave = () => {
     onSave({ ...block, content });
     onClose();
@@ -57,13 +83,57 @@ export function BlockEditorModal({ block, onSave, onClose }: BlockEditorModalPro
         const imageContent = content as ImageContent;
         return (
           <div className="space-y-4">
-            <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer ${isDragActive ? 'border-white' : 'border-gray-600'}`}>
-              <input {...getInputProps()} />
-              <Upload className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-              <p className="text-sm text-gray-400">
-                {uploading ? 'Uploading...' : 'Drag & drop an image, or click to select'}
-              </p>
+            <div className="flex gap-2">
+              <Button
+                variant={activeTab === 'upload' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveTab('upload')}
+                className={activeTab === 'upload' ? 'bg-white text-black' : 'border-gray-600 text-white hover:bg-gray-700'}
+              >
+                Upload
+              </Button>
+              <Button
+                variant={activeTab === 'existing' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveTab('existing')}
+                className={activeTab === 'existing' ? 'bg-white text-black' : 'border-gray-600 text-white hover:bg-gray-700'}
+              >
+                Existing
+              </Button>
             </div>
+            {activeTab === 'upload' && (
+              <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer ${isDragActive ? 'border-white' : 'border-gray-600'}`}>
+                <input {...getInputProps()} />
+                <Upload className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm text-gray-400">
+                  {uploading ? 'Uploading...' : 'Drag & drop an image, or click to select'}
+                </p>
+              </div>
+            )}
+            {activeTab === 'existing' && (
+              <div className="space-y-3">
+                {loadingImages && (
+                  <p className="text-sm text-gray-400">Loading images...</p>
+                )}
+                {!loadingImages && existingImages.length === 0 && (
+                  <p className="text-sm text-gray-400">No images yet. Upload one first.</p>
+                )}
+                {!loadingImages && existingImages.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {existingImages.map((image) => (
+                      <button
+                        key={image.url}
+                        type="button"
+                        onClick={() => setContent({ ...imageContent, url: image.url })}
+                        className={`relative rounded-lg overflow-hidden border ${imageContent.url === image.url ? 'border-white' : 'border-gray-700'} hover:border-white transition-colors`}
+                      >
+                        <img src={image.url} alt={image.name} className="w-full h-24 object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {imageContent.url && (
               <img src={imageContent.url} alt="Preview" className="w-full rounded-lg" />
             )}
