@@ -265,6 +265,35 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     });
   }, [containerWidth, blocks]);
 
+  // Ensure all layout keys are unique (fix old duplicated keys)
+  useEffect(() => {
+    setBlocks((prev) => {
+      const seen = new Set<string>();
+      let changed = false;
+
+      const next = prev.map((block) => {
+        const currentKey = block.layout.i;
+        if (!seen.has(currentKey)) {
+          seen.add(currentKey);
+          return block;
+        }
+
+        // Duplicate key found, generate a new one
+        const newKey = createBlockId('block');
+        changed = true;
+        return {
+          ...block,
+          layout: {
+            ...block.layout,
+            i: newKey,
+          },
+        };
+      });
+
+      return changed ? next : prev;
+    });
+  }, []);
+
   const layout = blocks.map((block) => ({
     i: block.layout.i,
     x: block.layout.x,
