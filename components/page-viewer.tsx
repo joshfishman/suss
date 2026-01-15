@@ -7,6 +7,9 @@ interface PageViewerProps {
   blocks: ContentBlock[];
 }
 
+const ROW_HEIGHT = 50;
+const GAP = 16;
+
 export function PageViewer({ blocks }: PageViewerProps) {
   if (blocks.length === 0) {
     return null;
@@ -19,20 +22,20 @@ export function PageViewer({ blocks }: PageViewerProps) {
         {blocks.map((block) => {
           const { x, y, w, h } = block.layout;
           
-          // Calculate positioning based on a 4-column grid
+          // Calculate positioning based on a 4-column grid with 50px rows
           const leftPercent = (x / 4) * 100;
           const widthPercent = (w / 4) * 100;
-          const topPx = y * 150 + y * 16; // Each grid row is 150px with 16px gap
-          const heightPx = h * 150 + (h - 1) * 16;
+          const topPx = y * ROW_HEIGHT + y * GAP;
+          const heightPx = h * ROW_HEIGHT + (h - 1) * GAP;
 
           return (
             <div
               key={block.id}
-              className="absolute"
+              className="absolute rounded-lg overflow-hidden"
               style={{
-                left: `calc(${leftPercent}% + ${x * 4}px)`,
+                left: `calc(${leftPercent}% + ${x * (GAP / 4)}px)`,
                 top: `${topPx}px`,
-                width: `calc(${widthPercent}% - ${16 - (w * 4)}px)`,
+                width: `calc(${widthPercent}% - ${GAP - (w * (GAP / 4))}px)`,
                 height: `${heightPx}px`,
               }}
             >
@@ -43,7 +46,7 @@ export function PageViewer({ blocks }: PageViewerProps) {
         {/* Add spacer for total height */}
         <div
           style={{
-            height: `${Math.max(...blocks.map(b => (b.layout.y + b.layout.h) * 150 + b.layout.y * 16))}px`,
+            height: `${Math.max(...blocks.map(b => (b.layout.y + b.layout.h) * ROW_HEIGHT + b.layout.y * GAP))}px`,
           }}
         />
       </div>

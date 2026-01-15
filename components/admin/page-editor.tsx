@@ -136,7 +136,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     h: block.layout.h,
     minW: 1,
     maxW: 4,
-    minH: 1,
+    minH: 2,
   }));
 
   const handleLayoutChange = useCallback((newLayout: Layout) => {
@@ -185,7 +185,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         x: nextX,
         y: nextY,
         w: 1,
-        h: type === 'text' ? 2 : 3,
+        h: type === 'text' ? 3 : 6, // 6 rows = 300px for images/videos
       },
       sort_order: blocks.length,
       created_at: new Date().toISOString(),
@@ -242,7 +242,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
               x: 0,
               y: existingMaxY,
               w: 2,
-              h: 3,
+              h: 6, // 6 rows = 300px
             },
             sort_order: blocks.length,
             created_at: new Date().toISOString(),
@@ -425,9 +425,10 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             width={containerWidth}
             onLayoutChange={handleLayoutChange}
             compactor={horizontalCompactor}
+            autoSize={true}
             gridConfig={{
               cols: 4,
-              rowHeight: 150,
+              rowHeight: 50,
               margin: [16, 16] as const,
               containerPadding: [0, 0] as const,
             }}
