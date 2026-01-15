@@ -162,11 +162,54 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   // Initialize aspect ratios for existing blocks
   useEffect(() => {
     blocks.forEach((block) => {
+      if (block.block_type === 'vimeo') {
+        aspectRatios.current[block.layout.i] = 16 / 9;
+        return;
+      }
       if (!aspectRatios.current[block.layout.i]) {
         aspectRatios.current[block.layout.i] = block.layout.w / block.layout.h;
       }
     });
   }, [blocks]);
+  
+  // Load actual image ratios for image blocks so resizing keeps the real aspect
+  useEffect(() => {
+    blocks.forEach(async (block) => {
+      if (block.block_type !== 'image') return;
+      const content = block.content as { url?: string };
+      if (!content?.url) return;
+      if (aspectRatios.current[block.layout.i]) return;
+      
+      try {
+        const dimensions = await getImageDimensions(content.url);
+        aspectRatios.current[block.layout.i] = dimensions.width / dimensions.height;
+      } catch (e) {
+        // Fall back to layout ratio if image fails to load
+        aspectRatios.current[block.layout.i] = block.layout.w / block.layout.h;
+      }
+    });
+  }, [blocks]);
+
+  // Normalize Vimeo blocks to 16:9 on load
+  useEffect(() => {
+    setBlocks((prev) => {
+      let changed = false;
+      const next = prev.map((block) => {
+        if (block.block_type !== 'vimeo') return block;
+        const targetH = Math.max(1, Math.round(block.layout.w / (16 / 9)));
+        if (block.layout.h === targetH) return block;
+        changed = true;
+        return {
+          ...block,
+          layout: {
+            ...block.layout,
+            h: targetH,
+          },
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
 
   const layout = blocks.map((block) => ({
     i: block.layout.i,
@@ -209,9 +252,13 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   ) => {
     // Find the block to check its type
     const block = blocks.find(b => b.layout.i === newItem.i);
+    if (!block) return;
+    
+    // Only lock aspect for image and Vimeo blocks
+    if (block.block_type === 'text') return;
     
     // Use stored ratio, but enforce 16:9 for Vimeo blocks
-    const ratio = block?.block_type === 'vimeo' ? 16/9 : aspectRatios.current[newItem.i];
+    const ratio = block.block_type === 'vimeo' ? 16 / 9 : aspectRatios.current[newItem.i];
     if (!ratio) return;
 
     // Determine if width or height changed more
@@ -220,14 +267,12 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
     if (widthChanged) {
       // Width changed, adjust height to maintain ratio
-      // For 16:9: ratio = 1.78, so height = width / 1.78
-      // With 50px rows and ~300px columns: 2 cols = 600px, 600/1.78 = 337px = ~7 rows
-      const newHeight = Math.max(2, Math.round(newItem.w / ratio * 6)); // Scale factor for grid units
+      const newHeight = Math.max(1, Math.round(newItem.w / ratio));
       newItem.h = newHeight;
       placeholder.h = newHeight;
     } else if (heightChanged) {
       // Height changed, adjust width to maintain ratio
-      const newWidth = Math.min(4, Math.max(1, Math.round(newItem.h * ratio / 6)));
+      const newWidth = Math.min(4, Math.max(1, Math.round(newItem.h * ratio)));
       newItem.w = newWidth;
       placeholder.w = newWidth;
     }
@@ -241,14 +286,21 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   ) => {
     // Find the block to check its type
     const block = blocks.find(b => b.layout.i === newItem.i);
+    if (!block) return;
     
-    // Vimeo blocks always stay at 16:9, don't update their ratio
-    if (block?.block_type === 'vimeo') {
-      aspectRatios.current[newItem.i] = 16/9;
-    } else {
-      // For other blocks, update the stored aspect ratio
-      aspectRatios.current[newItem.i] = newItem.w / newItem.h;
+    // Vimeo blocks always stay at 16:9
+    if (block.block_type === 'vimeo') {
+      aspectRatios.current[newItem.i] = 16 / 9;
+      return;
     }
+    
+    // Image blocks keep their original aspect ratio
+    if (block.block_type === 'image') {
+      return;
+    }
+    
+    // Text blocks can update their ratio
+    aspectRatios.current[newItem.i] = newItem.w / newItem.h;
   }, [blocks]);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo' | 'text') => {
