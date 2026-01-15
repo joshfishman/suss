@@ -29,6 +29,13 @@ const GRID_COLS = 4;
 const GRID_ROW_HEIGHT = 50;
 const GRID_MARGIN: [number, number] = [16, 16];
 
+function createBlockId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function getColWidth(containerWidth: number) {
   const [marginX] = GRID_MARGIN;
   return (containerWidth - marginX * (GRID_COLS - 1)) / GRID_COLS;
@@ -359,7 +366,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     const nextX = usedWidth < 4 ? usedWidth : 0;
     const nextY = usedWidth < 4 ? 0 : (blocks.length > 0 ? Math.max(...blocks.map(b => b.layout.y + b.layout.h)) : 0);
 
-    const blockId = `block-${Date.now()}`;
+    const blockId = createBlockId('block');
     
     // Set dimensions based on block type
     // Vimeo always 16:9, text is compact, images start square-ish
@@ -382,7 +389,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     aspectRatios.current[blockId] = type === 'vimeo' ? 16 / 9 : blockW / blockH;
 
     const newBlock: ContentBlock = {
-      id: `temp-${Date.now()}`,
+      id: createBlockId('temp'),
       page_id: page.id,
       block_type: type,
       content: type === 'image' 
@@ -461,13 +468,13 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
           const nextX = usedWidth + blockW <= GRID_COLS ? usedWidth : 0;
           const nextY = usedWidth + blockW <= GRID_COLS ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
           
-          const blockId = `block-${Date.now()}-${Math.random()}`;
+          const blockId = createBlockId('block');
           
           // Store the actual image aspect ratio for resize locking
           aspectRatios.current[blockId] = imgAspectRatio;
           
           const newBlock: ContentBlock = {
-            id: `temp-${Date.now()}-${Math.random()}`,
+            id: createBlockId('temp'),
             page_id: page.id,
             block_type: 'image',
             content: { url: data.url, alt: file.name, caption: '' },
