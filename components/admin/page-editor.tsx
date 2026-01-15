@@ -96,32 +96,47 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         }
       }
 
-      // Delete all existing temp blocks and recreate
-      for (const block of lastSavedRef.current.blocks) {
-        if (!block.id.startsWith('temp-')) {
-          await fetch(`/api/content-blocks/${block.id}`, {
-            method: 'DELETE',
+      // Upsert blocks (create temp blocks, update existing ones)
+      const updatedBlocks: ContentBlock[] = [];
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+
+        if (block.id.startsWith('temp-')) {
+          const response = await fetch('/api/content-blocks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              page_id: page.id,
+              block_type: block.block_type,
+              content: block.content,
+              layout: block.layout,
+              sort_order: i,
+            }),
           });
+
+          if (response.ok) {
+            const data = await response.json();
+            updatedBlocks.push({ ...block, id: data.id });
+          } else {
+            updatedBlocks.push(block);
+          }
+        } else {
+          await fetch(`/api/content-blocks/${block.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: block.content,
+              layout: block.layout,
+              sort_order: i,
+            }),
+          });
+          updatedBlocks.push(block);
         }
       }
 
-      // Create all blocks fresh
-      for (let i = 0; i < blocks.length; i++) {
-        const block = blocks[i];
-        await fetch('/api/content-blocks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            page_id: page.id,
-            block_type: block.block_type,
-            content: block.content,
-            layout: block.layout,
-            sort_order: i,
-          }),
-        });
-      }
+      setBlocks(updatedBlocks);
 
-      lastSavedRef.current = { title, description, blocks };
+      lastSavedRef.current = { title, description, blocks: updatedBlocks };
       setSaveStatus('saved');
     } catch (error) {
       console.error('Save failed:', error);
