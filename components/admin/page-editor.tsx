@@ -6,12 +6,11 @@ import { useDropzone } from 'react-dropzone';
 import GridLayout, { Layout, LayoutItem, horizontalCompactor } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import { Page, ContentBlock, ImageContent, VimeoContent, TextContent } from '@/lib/types/content';
+import { Page, ContentBlock } from '@/lib/types/content';
 import { BlockRenderer } from '@/components/content-blocks/block-renderer';
 import { BlockEditorModal } from './block-editor-modal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Trash2, Edit, Plus, Video, Type, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Trash2, Edit, Video, Type, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface PageEditorProps {
@@ -25,10 +24,15 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const [title, setTitle] = useState(page.title);
   const [description, setDescription] = useState(page.description || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
 
   useEffect(() => {
     const updateWidth = () => {
@@ -40,6 +44,89 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     window.addEventListener('resize', updateWidth);
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
+
+  // Auto-save function
+  const performSave = useCallback(async () => {
+    setSaveStatus('saving');
+    setIsSaving(true);
+    
+    try {
+      // Save page settings
+      await fetch(`/api/pages/${page.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description }),
+      });
+
+      // Delete blocks that were removed
+      for (const block of lastSavedRef.current.blocks) {
+        if (!block.id.startsWith('temp-') && !blocks.find(b => b.id === block.id)) {
+          await fetch(`/api/content-blocks/${block.id}`, {
+            method: 'DELETE',
+          });
+        }
+      }
+
+      // Delete all existing temp blocks and recreate
+      for (const block of lastSavedRef.current.blocks) {
+        if (!block.id.startsWith('temp-')) {
+          await fetch(`/api/content-blocks/${block.id}`, {
+            method: 'DELETE',
+          });
+        }
+      }
+
+      // Create all blocks fresh
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+        await fetch('/api/content-blocks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            page_id: page.id,
+            block_type: block.block_type,
+            content: block.content,
+            layout: block.layout,
+            sort_order: i,
+          }),
+        });
+      }
+
+      lastSavedRef.current = { title, description, blocks };
+      setSaveStatus('saved');
+    } catch (error) {
+      console.error('Save failed:', error);
+      setSaveStatus('unsaved');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [title, description, blocks, page.slug, page.id]);
+
+  // Trigger auto-save on changes
+  useEffect(() => {
+    const hasChanges = 
+      title !== lastSavedRef.current.title ||
+      description !== lastSavedRef.current.description ||
+      JSON.stringify(blocks) !== JSON.stringify(lastSavedRef.current.blocks);
+
+    if (hasChanges) {
+      setSaveStatus('unsaved');
+      
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      saveTimeoutRef.current = setTimeout(() => {
+        performSave();
+      }, 1500); // Auto-save after 1.5 seconds of inactivity
+    }
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [title, description, blocks, performSave]);
 
   const layout = blocks.map((block) => ({
     i: block.layout.i,
@@ -178,46 +265,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     onDragLeave: () => setIsDraggingFile(false),
   });
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      // Save page settings
-      await fetch(`/api/pages/${page.slug}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description }),
-      });
-
-      // Delete all existing blocks
-      for (const block of initialBlocks) {
-        if (!block.id.startsWith('temp-')) {
-          await fetch(`/api/content-blocks/${block.id}`, {
-            method: 'DELETE',
-          });
-        }
-      }
-
-      // Create new blocks
-      for (let i = 0; i < blocks.length; i++) {
-        const block = blocks[i];
-        await fetch('/api/content-blocks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            page_id: page.id,
-            block_type: block.block_type,
-            content: block.content,
-            layout: block.layout,
-            sort_order: i,
-          }),
-        });
-      }
-
-      router.refresh();
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white" {...getRootProps()}>
@@ -281,10 +328,23 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
                   Preview
                 </Button>
               </Link>
-              <Button onClick={handleSave} disabled={isSaving} size="sm" className="bg-white text-black hover:bg-gray-200">
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? 'Saving...' : 'Save'}
-              </Button>
+              <div className="flex items-center gap-2 text-sm">
+                {saveStatus === 'saving' && (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                    <span className="text-gray-400">Saving...</span>
+                  </>
+                )}
+                {saveStatus === 'saved' && (
+                  <>
+                    <Check className="w-4 h-4 text-green-400" />
+                    <span className="text-green-400">Saved</span>
+                  </>
+                )}
+                {saveStatus === 'unsaved' && (
+                  <span className="text-yellow-400">Unsaved changes</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -309,19 +369,32 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       {/* Page hero - editable */}
       <section className="py-20 px-8 bg-white">
         <div className="container mx-auto max-w-4xl">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 border-none p-0 h-auto bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-            placeholder="Page Title"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="text-lg md:text-xl font-light text-gray-500 leading-relaxed max-w-2xl w-full border-none p-0 bg-transparent resize-none focus:outline-none"
-            placeholder="Page description..."
-            rows={3}
-          />
+          <h1
+            ref={titleRef}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => setTitle(e.currentTarget.textContent || '')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
+            className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
+            data-placeholder="Page Title"
+          >
+            {title}
+          </h1>
+          <p
+            ref={descriptionRef}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => setDescription(e.currentTarget.textContent || '')}
+            className="text-lg md:text-xl font-light text-gray-500 leading-relaxed max-w-2xl outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
+            data-placeholder="Click to add a description..."
+          >
+            {description || ''}
+          </p>
         </div>
       </section>
 
