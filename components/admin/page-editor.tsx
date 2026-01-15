@@ -128,6 +128,18 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     };
   }, [title, description, blocks, performSave]);
 
+  // Store aspect ratios for each block (width/height in grid units)
+  const aspectRatios = useRef<Record<string, number>>({});
+  
+  // Initialize aspect ratios for existing blocks
+  useEffect(() => {
+    blocks.forEach((block) => {
+      if (!aspectRatios.current[block.layout.i]) {
+        aspectRatios.current[block.layout.i] = block.layout.w / block.layout.h;
+      }
+    });
+  }, [blocks]);
+
   const layout = blocks.map((block) => ({
     i: block.layout.i,
     x: block.layout.x,
@@ -136,7 +148,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     h: block.layout.h,
     minW: 1,
     maxW: 4,
-    minH: 2,
+    minH: 1,
   }));
 
   const handleLayoutChange = useCallback((newLayout: Layout) => {
@@ -160,6 +172,43 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     );
   }, []);
 
+  // Handle resize to maintain aspect ratio
+  const handleResize = useCallback((
+    layout: Layout,
+    oldItem: LayoutItem,
+    newItem: LayoutItem,
+    placeholder: LayoutItem
+  ) => {
+    const ratio = aspectRatios.current[newItem.i];
+    if (!ratio) return;
+
+    // Determine if width or height changed more
+    const widthChanged = newItem.w !== oldItem.w;
+    const heightChanged = newItem.h !== oldItem.h;
+
+    if (widthChanged) {
+      // Width changed, adjust height to maintain ratio
+      const newHeight = Math.max(1, Math.round(newItem.w / ratio));
+      newItem.h = newHeight;
+      placeholder.h = newHeight;
+    } else if (heightChanged) {
+      // Height changed, adjust width to maintain ratio
+      const newWidth = Math.min(4, Math.max(1, Math.round(newItem.h * ratio)));
+      newItem.w = newWidth;
+      placeholder.w = newWidth;
+    }
+  }, []);
+
+  // Update aspect ratio when resize stops
+  const handleResizeStop = useCallback((
+    layout: Layout,
+    oldItem: LayoutItem,
+    newItem: LayoutItem
+  ) => {
+    // Update the stored aspect ratio after resize
+    aspectRatios.current[newItem.i] = newItem.w / newItem.h;
+  }, []);
+
   const handleAddBlock = useCallback((type: 'image' | 'vimeo' | 'text') => {
     // Find first row (y=0) and calculate used width there
     const firstRowBlocks = blocks.filter(b => b.layout.y === 0);
@@ -168,6 +217,13 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     // If there's space in the first row, add there; otherwise start a new row
     const nextX = usedWidth < 4 ? usedWidth : 0;
     const nextY = usedWidth < 4 ? 0 : (blocks.length > 0 ? Math.max(...blocks.map(b => b.layout.y + b.layout.h)) : 0);
+
+    const blockId = `block-${Date.now()}`;
+    const blockW = 1;
+    const blockH = type === 'text' ? 3 : 6; // 6 rows = 300px for images/videos
+    
+    // Set initial aspect ratio
+    aspectRatios.current[blockId] = blockW / blockH;
 
     const newBlock: ContentBlock = {
       id: `temp-${Date.now()}`,
@@ -179,11 +235,11 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         ? { vimeo_id: '', title: '', caption: '' }
         : { html: 'Click to edit text', style: 'paragraph' },
       layout: {
-        i: `block-${Date.now()}`,
+        i: blockId,
         x: nextX,
         y: nextY,
-        w: 1,
-        h: type === 'text' ? 3 : 6, // 6 rows = 300px for images/videos
+        w: blockW,
+        h: blockH,
       },
       sort_order: blocks.length,
       created_at: new Date().toISOString(),
@@ -236,17 +292,24 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
           const nextX = usedWidth < 4 ? usedWidth : 0;
           const nextY = usedWidth < 4 ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
           
+          const blockId = `block-${Date.now()}-${Math.random()}`;
+          const blockW = 1;
+          const blockH = 6;
+          
+          // Set initial aspect ratio for the new block
+          aspectRatios.current[blockId] = blockW / blockH;
+          
           const newBlock: ContentBlock = {
             id: `temp-${Date.now()}-${Math.random()}`,
             page_id: page.id,
             block_type: 'image',
             content: { url: data.url, alt: file.name, caption: '' },
             layout: {
-              i: `block-${Date.now()}-${Math.random()}`,
+              i: blockId,
               x: nextX,
               y: nextY,
-              w: 1, // Start at 1 column width, side by side
-              h: 6, // 6 rows = 300px
+              w: blockW,
+              h: blockH,
             },
             sort_order: blocks.length + newBlocks.length,
             created_at: new Date().toISOString(),
@@ -432,6 +495,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             layout={layout}
             width={containerWidth}
             onLayoutChange={handleLayoutChange}
+            onResize={handleResize}
+            onResizeStop={handleResizeStop}
             compactor={horizontalCompactor}
             autoSize={true}
             gridConfig={{
