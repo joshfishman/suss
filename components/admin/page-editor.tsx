@@ -366,7 +366,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
 
   return (
-    <div className="min-h-screen bg-white" {...getRootProps()}>
+    <div className="min-h-screen bg-black text-white" {...getRootProps()}>
       <input {...getInputProps()} />
       
       {/* Drag overlay */}
@@ -476,7 +476,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
               contentEditable
               suppressContentEditableWarning
               onBlur={(e) => setDescription(e.currentTarget.textContent || '')}
-              className="text-lg md:text-xl font-light text-muted-foreground leading-relaxed max-w-2xl outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
+              className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
               data-placeholder="Click to add a description..."
             >
               {description || ''}
