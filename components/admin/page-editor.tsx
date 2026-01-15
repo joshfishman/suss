@@ -85,6 +85,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
+  const hasNormalizedKeysRef = useRef(false);
+  const normalizedMediaRef = useRef(new Set<string>());
 
   useEffect(() => {
     const updateWidth = () => {
@@ -183,6 +185,27 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   // Store aspect ratios for each block (width/height in grid units)
   const aspectRatios = useRef<Record<string, number>>({});
   
+  // Normalize duplicate layout keys on first load
+  useEffect(() => {
+    if (hasNormalizedKeysRef.current) return;
+    hasNormalizedKeysRef.current = true;
+
+    setBlocks((prev) => {
+      const seen = new Set<string>();
+      let changed = false;
+      const next = prev.map((block) => {
+        let key = block.layout.i || block.id;
+        if (!key || seen.has(key)) {
+          key = createBlockId('block');
+          changed = true;
+        }
+        seen.add(key);
+        return key === block.layout.i ? block : { ...block, layout: { ...block.layout, i: key } };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
   // Initialize aspect ratios for existing blocks
   useEffect(() => {
     blocks.forEach((block) => {
@@ -202,13 +225,14 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       if (block.block_type !== 'image') return;
       const content = block.content as { url?: string };
       if (!content?.url) return;
-      
+      if (normalizedMediaRef.current.has(block.layout.i)) return;
+
       try {
         const dimensions = await getImageDimensions(content.url);
         const ratio = dimensions.width / dimensions.height;
         aspectRatios.current[block.layout.i] = ratio;
 
-        // Update layout height to match the real image ratio
+        // Update layout height to match the real image ratio once
         const targetH = heightForRatio(block.layout.w, ratio, containerWidth || 1200);
         if (block.layout.h !== targetH) {
           setBlocks((prev) =>
@@ -219,51 +243,35 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             )
           );
         }
+        normalizedMediaRef.current.add(block.layout.i);
       } catch (e) {
         // Fall back to layout ratio if image fails to load
         aspectRatios.current[block.layout.i] = block.layout.w / block.layout.h;
+        normalizedMediaRef.current.add(block.layout.i);
       }
     });
   }, [blocks, containerWidth]);
 
-  // Normalize media blocks to their actual ratios on load and resize
+  // Normalize Vimeo blocks to 16:9 on resize only (avoid infinite loops)
   useEffect(() => {
     setBlocks((prev) => {
       let changed = false;
       const next = prev.map((block) => {
-        if (block.block_type === 'vimeo') {
-          const targetH = heightForRatio(block.layout.w, 16 / 9, containerWidth || 1200);
-          if (block.layout.h === targetH) return block;
-          changed = true;
-          return {
-            ...block,
-            layout: {
-              ...block.layout,
-              h: targetH,
-            },
-          };
-        }
-
-        if (block.block_type === 'image') {
-          const ratio = aspectRatios.current[block.layout.i];
-          if (!ratio) return block;
-          const targetH = heightForRatio(block.layout.w, ratio, containerWidth || 1200);
-          if (block.layout.h === targetH) return block;
-          changed = true;
-          return {
-            ...block,
-            layout: {
-              ...block.layout,
-              h: targetH,
-            },
-          };
-        }
-
-        return block;
+        if (block.block_type !== 'vimeo') return block;
+        const targetH = heightForRatio(block.layout.w, 16 / 9, containerWidth || 1200);
+        if (block.layout.h === targetH) return block;
+        changed = true;
+        return {
+          ...block,
+          layout: {
+            ...block.layout,
+            h: targetH,
+          },
+        };
       });
       return changed ? next : prev;
     });
-  }, [containerWidth, blocks]);
+  }, [containerWidth]);
 
   // Ensure all layout keys are unique (fix old duplicated keys)
   useEffect(() => {
