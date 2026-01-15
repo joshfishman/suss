@@ -161,15 +161,13 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   }, []);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo' | 'text') => {
-    const existingMaxY = blocks.length > 0 
-      ? Math.max(...blocks.map(b => b.layout.y + b.layout.h))
-      : 0;
+    // Find first row (y=0) and calculate used width there
+    const firstRowBlocks = blocks.filter(b => b.layout.y === 0);
+    const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
     
-    // Find next available x position in the current row
-    const currentRowBlocks = blocks.filter(b => b.layout.y === existingMaxY - 1);
-    const usedWidth = currentRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
+    // If there's space in the first row, add there; otherwise start a new row
     const nextX = usedWidth < 4 ? usedWidth : 0;
-    const nextY = usedWidth < 4 && blocks.length > 0 ? existingMaxY - 1 : existingMaxY;
+    const nextY = usedWidth < 4 ? 0 : (blocks.length > 0 ? Math.max(...blocks.map(b => b.layout.y + b.layout.h)) : 0);
 
     const newBlock: ContentBlock = {
       id: `temp-${Date.now()}`,
@@ -212,6 +210,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setIsDraggingFile(false);
     
+    const newBlocks: ContentBlock[] = [];
+    
     for (const file of acceptedFiles) {
       if (!file.type.startsWith('image/')) continue;
       
@@ -227,10 +227,14 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         if (response.ok) {
           const data = await response.json();
           
-          // Find next position
-          const existingMaxY = blocks.length > 0 
-            ? Math.max(...blocks.map(b => b.layout.y + b.layout.h))
-            : 0;
+          // Calculate position: place side by side on first row (y=0)
+          const allBlocks = [...blocks, ...newBlocks];
+          const firstRowBlocks = allBlocks.filter(b => b.layout.y === 0);
+          const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
+          
+          // If there's space in first row, add there; otherwise start new row
+          const nextX = usedWidth < 4 ? usedWidth : 0;
+          const nextY = usedWidth < 4 ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
           
           const newBlock: ContentBlock = {
             id: `temp-${Date.now()}-${Math.random()}`,
@@ -239,21 +243,25 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             content: { url: data.url, alt: file.name, caption: '' },
             layout: {
               i: `block-${Date.now()}-${Math.random()}`,
-              x: 0,
-              y: existingMaxY,
-              w: 2,
+              x: nextX,
+              y: nextY,
+              w: 1, // Start at 1 column width, side by side
               h: 6, // 6 rows = 300px
             },
-            sort_order: blocks.length,
+            sort_order: blocks.length + newBlocks.length,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
           
-          setBlocks((prev) => [...prev, newBlock]);
+          newBlocks.push(newBlock);
         }
       } catch (error) {
         console.error('Upload failed:', error);
       }
+    }
+    
+    if (newBlocks.length > 0) {
+      setBlocks((prev) => [...prev, ...newBlocks]);
     }
   }, [blocks, page.id]);
 
