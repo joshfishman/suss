@@ -25,20 +25,37 @@ function getImageDimensions(url: string): Promise<{ width: number; height: numbe
   });
 }
 
-// Convert image dimensions to grid units (maintaining aspect ratio)
-function calculateGridSize(imgWidth: number, imgHeight: number, maxCols: number = 4, rowHeight: number = 50): { w: number; h: number } {
-  const aspectRatio = imgWidth / imgHeight;
-  
-  // Start with 2 columns as default width
-  const defaultWidth = 2;
-  // Calculate height based on aspect ratio
-  // Each column is roughly 25% of container, assume container ~1200px = 300px per column
-  const colWidth = 300;
-  const pixelWidth = defaultWidth * colWidth;
-  const pixelHeight = pixelWidth / aspectRatio;
-  const gridHeight = Math.max(2, Math.round(pixelHeight / rowHeight));
-  
-  return { w: defaultWidth, h: gridHeight };
+const GRID_COLS = 4;
+const GRID_ROW_HEIGHT = 50;
+const GRID_MARGIN: [number, number] = [16, 16];
+
+function getColWidth(containerWidth: number) {
+  const [marginX] = GRID_MARGIN;
+  return (containerWidth - marginX * (GRID_COLS - 1)) / GRID_COLS;
+}
+
+function gridWidthPx(w: number, containerWidth: number) {
+  const [marginX] = GRID_MARGIN;
+  const colWidth = getColWidth(containerWidth);
+  return w * colWidth + (w - 1) * marginX;
+}
+
+function gridHeightPx(h: number) {
+  const [, marginY] = GRID_MARGIN;
+  return h * GRID_ROW_HEIGHT + (h - 1) * marginY;
+}
+
+function heightForRatio(w: number, ratio: number, containerWidth: number) {
+  const [, marginY] = GRID_MARGIN;
+  const targetHeightPx = gridWidthPx(w, containerWidth) / ratio;
+  return Math.max(1, Math.round((targetHeightPx + marginY) / (GRID_ROW_HEIGHT + marginY)));
+}
+
+function widthForRatio(h: number, ratio: number, containerWidth: number) {
+  const [marginX] = GRID_MARGIN;
+  const targetWidthPx = gridHeightPx(h) * ratio;
+  const colWidth = getColWidth(containerWidth);
+  return Math.min(GRID_COLS, Math.max(1, Math.round((targetWidthPx + marginX) / (colWidth + marginX))));
 }
 
 interface PageEditorProps {
@@ -178,7 +195,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       if (block.block_type !== 'image') return;
       const content = block.content as { url?: string };
       if (!content?.url) return;
-      if (aspectRatios.current[block.layout.i]) return;
       
       try {
         const dimensions = await getImageDimensions(content.url);
@@ -196,7 +212,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       let changed = false;
       const next = prev.map((block) => {
         if (block.block_type !== 'vimeo') return block;
-        const targetH = Math.max(1, Math.round(block.layout.w / (16 / 9)));
+        const targetH = heightForRatio(block.layout.w, 16 / 9, containerWidth || 1200);
         if (block.layout.h === targetH) return block;
         changed = true;
         return {
@@ -209,7 +225,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       });
       return changed ? next : prev;
     });
-  }, []);
+  }, [containerWidth]);
 
   const layout = blocks.map((block) => ({
     i: block.layout.i,
@@ -267,16 +283,16 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
     if (widthChanged) {
       // Width changed, adjust height to maintain ratio
-      const newHeight = Math.max(1, Math.round(newItem.w / ratio));
+      const newHeight = heightForRatio(newItem.w, ratio, containerWidth || 1200);
       newItem.h = newHeight;
       placeholder.h = newHeight;
     } else if (heightChanged) {
       // Height changed, adjust width to maintain ratio
-      const newWidth = Math.min(4, Math.max(1, Math.round(newItem.h * ratio)));
+      const newWidth = widthForRatio(newItem.h, ratio, containerWidth || 1200);
       newItem.w = newWidth;
       placeholder.w = newWidth;
     }
-  }, [blocks]);
+  }, [blocks, containerWidth]);
 
   // Update aspect ratio when resize stops (but keep Vimeo at 16:9)
   const handleResizeStop = useCallback((
@@ -320,20 +336,19 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     let blockH: number;
     
     if (type === 'vimeo') {
-      // 16:9 ratio: 2 columns wide, ~7 rows tall (600px / 1.78 / 50px ≈ 7)
       blockW = 2;
-      blockH = 7;
+      blockH = heightForRatio(blockW, 16 / 9, containerWidth || 1200);
     } else if (type === 'text') {
       blockW = 1;
       blockH = 3;
     } else {
       // Image - start with placeholder size, will be updated when image loads
       blockW = 2;
-      blockH = 6;
+      blockH = heightForRatio(blockW, 1, containerWidth || 1200);
     }
     
     // Set initial aspect ratio (16/9 for vimeo, calculated for others)
-    aspectRatios.current[blockId] = type === 'vimeo' ? 16/9 : blockW / blockH;
+    aspectRatios.current[blockId] = type === 'vimeo' ? 16 / 9 : blockW / blockH;
 
     const newBlock: ContentBlock = {
       id: `temp-${Date.now()}`,
@@ -356,7 +371,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       updated_at: new Date().toISOString(),
     };
     setBlocks((prev) => [...prev, newBlock]);
-  }, [page.id, blocks]);
+  }, [page.id, blocks, containerWidth]);
 
   const handleDeleteBlock = useCallback((blockId: string) => {
     setBlocks((prev) => prev.filter((b) => b.id !== blockId));
@@ -395,15 +410,13 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
           
           // Get image dimensions to calculate proper aspect ratio
           let blockW = 2;
-          let blockH = 6;
+          let blockH = heightForRatio(blockW, 1, containerWidth || 1200);
           let imgAspectRatio = blockW / blockH;
           
           try {
             const dimensions = await getImageDimensions(data.url);
-            const gridSize = calculateGridSize(dimensions.width, dimensions.height);
-            blockW = gridSize.w;
-            blockH = gridSize.h;
             imgAspectRatio = dimensions.width / dimensions.height;
+            blockH = heightForRatio(blockW, imgAspectRatio, containerWidth || 1200);
           } catch (e) {
             console.warn('Could not get image dimensions, using defaults');
           }
@@ -414,8 +427,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
           const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
           
           // If there's space in first row, add there; otherwise start new row
-          const nextX = usedWidth + blockW <= 4 ? usedWidth : 0;
-          const nextY = usedWidth + blockW <= 4 ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
+          const nextX = usedWidth + blockW <= GRID_COLS ? usedWidth : 0;
+          const nextY = usedWidth + blockW <= GRID_COLS ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
           
           const blockId = `block-${Date.now()}-${Math.random()}`;
           
