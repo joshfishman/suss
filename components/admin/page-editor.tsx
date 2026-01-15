@@ -3,66 +3,23 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
-import GridLayout, { Layout, LayoutItem, horizontalCompactor } from 'react-grid-layout';
+import GridLayout, { Layout, LayoutItem } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { Page, ContentBlock } from '@/lib/types/content';
 import { BlockRenderer } from '@/components/content-blocks/block-renderer';
 import { BlockEditorModal } from './block-editor-modal';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trash2, Edit, Video, Type, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Edit, Video, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-
-// Helper to get image dimensions
-function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image();
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = reject;
-    img.src = url;
-  });
-}
-
-const GRID_COLS = 4;
-const GRID_ROW_HEIGHT = 50;
-const GRID_MARGIN: [number, number] = [16, 16];
 
 function createBlockId(prefix: string) {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
   }
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function getColWidth(containerWidth: number) {
-  const [marginX] = GRID_MARGIN;
-  return (containerWidth - marginX * (GRID_COLS - 1)) / GRID_COLS;
-}
-
-function gridWidthPx(w: number, containerWidth: number) {
-  const [marginX] = GRID_MARGIN;
-  const colWidth = getColWidth(containerWidth);
-  return w * colWidth + (w - 1) * marginX;
-}
-
-function gridHeightPx(h: number) {
-  const [, marginY] = GRID_MARGIN;
-  return h * GRID_ROW_HEIGHT + (h - 1) * marginY;
-}
-
-function heightForRatio(w: number, ratio: number, containerWidth: number) {
-  const [, marginY] = GRID_MARGIN;
-  const targetHeightPx = gridWidthPx(w, containerWidth) / ratio;
-  return Math.max(1, Math.round((targetHeightPx + marginY) / (GRID_ROW_HEIGHT + marginY)));
-}
-
-function widthForRatio(h: number, ratio: number, containerWidth: number) {
-  const [marginX] = GRID_MARGIN;
-  const targetWidthPx = gridHeightPx(h) * ratio;
-  const colWidth = getColWidth(containerWidth);
-  return Math.min(GRID_COLS, Math.max(1, Math.round((targetWidthPx + marginX) / (colWidth + marginX))));
 }
 
 function normalizeInitialBlocks(blocks: ContentBlock[]) {
@@ -105,7 +62,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
-  const normalizedMediaRef = useRef(new Set<string>());
 
   useEffect(() => {
     const updateWidth = () => {
@@ -201,75 +157,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     };
   }, [title, description, blocks, performSave]);
 
-  // Store aspect ratios for each block (width/height in grid units)
-  const aspectRatios = useRef<Record<string, number>>({});
-  
-  // Initialize aspect ratios for existing blocks
-  useEffect(() => {
-    blocks.forEach((block) => {
-      if (block.block_type === 'vimeo') {
-        aspectRatios.current[block.layout.i] = 16 / 9;
-        return;
-      }
-      if (!aspectRatios.current[block.layout.i]) {
-        aspectRatios.current[block.layout.i] = block.layout.w / block.layout.h;
-      }
-    });
-  }, [blocks]);
-  
-  // Load actual image ratios for image blocks so resizing keeps the real aspect
-  useEffect(() => {
-    blocks.forEach(async (block) => {
-      if (block.block_type !== 'image') return;
-      const content = block.content as { url?: string };
-      if (!content?.url) return;
-      if (normalizedMediaRef.current.has(block.layout.i)) return;
-
-      try {
-        const dimensions = await getImageDimensions(content.url);
-        const ratio = dimensions.width / dimensions.height;
-        aspectRatios.current[block.layout.i] = ratio;
-
-        // Update layout height to match the real image ratio once
-        const targetH = heightForRatio(block.layout.w, ratio, containerWidth || 1200);
-        if (block.layout.h !== targetH) {
-          setBlocks((prev) =>
-            prev.map((b) =>
-              b.layout.i === block.layout.i
-                ? { ...b, layout: { ...b.layout, h: targetH } }
-                : b
-            )
-          );
-        }
-        normalizedMediaRef.current.add(block.layout.i);
-      } catch (e) {
-        // Fall back to layout ratio if image fails to load
-        aspectRatios.current[block.layout.i] = block.layout.w / block.layout.h;
-        normalizedMediaRef.current.add(block.layout.i);
-      }
-    });
-  }, [blocks, containerWidth]);
-
-  // Normalize Vimeo blocks to 16:9 on resize only (avoid infinite loops)
-  useEffect(() => {
-    setBlocks((prev) => {
-      let changed = false;
-      const next = prev.map((block) => {
-        if (block.block_type !== 'vimeo') return block;
-        const targetH = heightForRatio(block.layout.w, 16 / 9, containerWidth || 1200);
-        if (block.layout.h === targetH) return block;
-        changed = true;
-        return {
-          ...block,
-          layout: {
-            ...block.layout,
-            h: targetH,
-          },
-        };
-      });
-      return changed ? next : prev;
-    });
-  }, [containerWidth]);
+  // No aspect ratio tracking (simplified editor)
 
   const layout = blocks.map((block) => ({
     i: block.layout.i,
@@ -303,67 +191,9 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     );
   }, []);
 
-  // Handle resize to maintain aspect ratio
-  const handleResize = useCallback((
-    layout: Layout,
-    oldItem: LayoutItem,
-    newItem: LayoutItem,
-    placeholder: LayoutItem
-  ) => {
-    // Find the block to check its type
-    const block = blocks.find(b => b.layout.i === newItem.i);
-    if (!block) return;
-    
-    // Only lock aspect for image and Vimeo blocks
-    if (block.block_type === 'text') return;
-    
-    // Use stored ratio, but enforce 16:9 for Vimeo blocks
-    const ratio = block.block_type === 'vimeo' ? 16 / 9 : aspectRatios.current[newItem.i];
-    if (!ratio) return;
+  // No custom resize handlers (keep default behavior)
 
-    // Determine if width or height changed more
-    const widthChanged = newItem.w !== oldItem.w;
-    const heightChanged = newItem.h !== oldItem.h;
-
-    if (widthChanged) {
-      // Width changed, adjust height to maintain ratio
-      const newHeight = heightForRatio(newItem.w, ratio, containerWidth || 1200);
-      newItem.h = newHeight;
-      placeholder.h = newHeight;
-    } else if (heightChanged) {
-      // Height changed, adjust width to maintain ratio
-      const newWidth = widthForRatio(newItem.h, ratio, containerWidth || 1200);
-      newItem.w = newWidth;
-      placeholder.w = newWidth;
-    }
-  }, [blocks, containerWidth]);
-
-  // Update aspect ratio when resize stops (but keep Vimeo at 16:9)
-  const handleResizeStop = useCallback((
-    layout: Layout,
-    oldItem: LayoutItem,
-    newItem: LayoutItem
-  ) => {
-    // Find the block to check its type
-    const block = blocks.find(b => b.layout.i === newItem.i);
-    if (!block) return;
-    
-    // Vimeo blocks always stay at 16:9
-    if (block.block_type === 'vimeo') {
-      aspectRatios.current[newItem.i] = 16 / 9;
-      return;
-    }
-    
-    // Image blocks keep their original aspect ratio
-    if (block.block_type === 'image') {
-      return;
-    }
-    
-    // Text blocks can update their ratio
-    aspectRatios.current[newItem.i] = newItem.w / newItem.h;
-  }, [blocks]);
-
-  const handleAddBlock = useCallback((type: 'image' | 'vimeo' | 'text') => {
+  const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     // Find first row (y=0) and calculate used width there
     const firstRowBlocks = blocks.filter(b => b.layout.y === 0);
     const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
@@ -374,25 +204,9 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
     const blockId = createBlockId('block');
     
-    // Set dimensions based on block type
-    // Vimeo always 16:9, text is compact, images start square-ish
-    let blockW: number;
-    let blockH: number;
-    
-    if (type === 'vimeo') {
-      blockW = 2;
-      blockH = heightForRatio(blockW, 16 / 9, containerWidth || 1200);
-    } else if (type === 'text') {
-      blockW = 1;
-      blockH = 3;
-    } else {
-      // Image - start with placeholder size, will be updated when image loads
-      blockW = 2;
-      blockH = heightForRatio(blockW, 1, containerWidth || 1200);
-    }
-    
-    // Set initial aspect ratio (16/9 for vimeo, calculated for others)
-    aspectRatios.current[blockId] = type === 'vimeo' ? 16 / 9 : blockW / blockH;
+    // Simple default sizing
+    const blockW = 2;
+    const blockH = 3;
 
     const newBlock: ContentBlock = {
       id: createBlockId('temp'),
@@ -400,9 +214,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       block_type: type,
       content: type === 'image' 
         ? { url: '', alt: '', caption: '' }
-        : type === 'vimeo'
-        ? { vimeo_id: '', title: '', caption: '' }
-        : { html: 'Click to edit text', style: 'paragraph' },
+        : { vimeo_id: '', title: '', caption: '' },
       layout: {
         i: blockId,
         x: nextX,
@@ -452,18 +264,9 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         if (response.ok) {
           const data = await response.json();
           
-          // Get image dimensions to calculate proper aspect ratio
-          let blockW = 2;
-          let blockH = heightForRatio(blockW, 1, containerWidth || 1200);
-          let imgAspectRatio = blockW / blockH;
-          
-          try {
-            const dimensions = await getImageDimensions(data.url);
-            imgAspectRatio = dimensions.width / dimensions.height;
-            blockH = heightForRatio(blockW, imgAspectRatio, containerWidth || 1200);
-          } catch (e) {
-            console.warn('Could not get image dimensions, using defaults');
-          }
+          // Simple default size for dropped images
+          const blockW = 2;
+          const blockH = 3;
           
           // Calculate position: place side by side on first row (y=0)
           const allBlocks = [...blocks, ...newBlocks];
@@ -471,13 +274,10 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
           const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
           
           // If there's space in first row, add there; otherwise start new row
-          const nextX = usedWidth + blockW <= GRID_COLS ? usedWidth : 0;
-          const nextY = usedWidth + blockW <= GRID_COLS ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
+          const nextX = usedWidth + blockW <= 4 ? usedWidth : 0;
+          const nextY = usedWidth + blockW <= 4 ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
           
           const blockId = createBlockId('block');
-          
-          // Store the actual image aspect ratio for resize locking
-          aspectRatios.current[blockId] = imgAspectRatio;
           
           const newBlock: ContentBlock = {
             id: createBlockId('temp'),
@@ -564,15 +364,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
                 <Video className="w-4 h-4 mr-2" />
                 Vimeo
               </Button>
-              <Button
-                onClick={() => handleAddBlock('text')}
-                variant="outline"
-                size="sm"
-                className="border-gray-600 text-white hover:bg-gray-800"
-              >
-                <Type className="w-4 h-4 mr-2" />
-                Text
-              </Button>
               <div className="w-px h-6 bg-gray-700 mx-2" />
               <Link href={`/${page.slug}`} target="_blank">
                 <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-800">
@@ -650,10 +441,6 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
                 <Video className="w-4 h-4 mr-2" />
                 Add Vimeo
               </Button>
-              <Button onClick={() => handleAddBlock('text')} variant="outline" size="sm">
-                <Type className="w-4 h-4 mr-2" />
-                Add Text
-              </Button>
             </div>
           </div>
         ) : (
@@ -662,21 +449,11 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             layout={layout}
             width={containerWidth}
             onLayoutChange={handleLayoutChange}
-            onResize={handleResize}
-            onResizeStop={handleResizeStop}
-            compactor={horizontalCompactor}
-            autoSize={true}
             gridConfig={{
               cols: 4,
-              rowHeight: 50,
+              rowHeight: 100,
               margin: [16, 16] as const,
               containerPadding: [0, 0] as const,
-            }}
-            dragConfig={{
-              enabled: true,
-            }}
-            resizeConfig={{
-              enabled: true,
             }}
           >
             {blocks.map((block) => (
