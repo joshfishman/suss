@@ -198,34 +198,65 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       
       try {
         const dimensions = await getImageDimensions(content.url);
-        aspectRatios.current[block.layout.i] = dimensions.width / dimensions.height;
+        const ratio = dimensions.width / dimensions.height;
+        aspectRatios.current[block.layout.i] = ratio;
+
+        // Update layout height to match the real image ratio
+        const targetH = heightForRatio(block.layout.w, ratio, containerWidth || 1200);
+        if (block.layout.h !== targetH) {
+          setBlocks((prev) =>
+            prev.map((b) =>
+              b.layout.i === block.layout.i
+                ? { ...b, layout: { ...b.layout, h: targetH } }
+                : b
+            )
+          );
+        }
       } catch (e) {
         // Fall back to layout ratio if image fails to load
         aspectRatios.current[block.layout.i] = block.layout.w / block.layout.h;
       }
     });
-  }, [blocks]);
+  }, [blocks, containerWidth]);
 
-  // Normalize Vimeo blocks to 16:9 on load
+  // Normalize media blocks to their actual ratios on load and resize
   useEffect(() => {
     setBlocks((prev) => {
       let changed = false;
       const next = prev.map((block) => {
-        if (block.block_type !== 'vimeo') return block;
-        const targetH = heightForRatio(block.layout.w, 16 / 9, containerWidth || 1200);
-        if (block.layout.h === targetH) return block;
-        changed = true;
-        return {
-          ...block,
-          layout: {
-            ...block.layout,
-            h: targetH,
-          },
-        };
+        if (block.block_type === 'vimeo') {
+          const targetH = heightForRatio(block.layout.w, 16 / 9, containerWidth || 1200);
+          if (block.layout.h === targetH) return block;
+          changed = true;
+          return {
+            ...block,
+            layout: {
+              ...block.layout,
+              h: targetH,
+            },
+          };
+        }
+
+        if (block.block_type === 'image') {
+          const ratio = aspectRatios.current[block.layout.i];
+          if (!ratio) return block;
+          const targetH = heightForRatio(block.layout.w, ratio, containerWidth || 1200);
+          if (block.layout.h === targetH) return block;
+          changed = true;
+          return {
+            ...block,
+            layout: {
+              ...block.layout,
+              h: targetH,
+            },
+          };
+        }
+
+        return block;
       });
       return changed ? next : prev;
     });
-  }, [containerWidth]);
+  }, [containerWidth, blocks]);
 
   const layout = blocks.map((block) => ({
     i: block.layout.i,
