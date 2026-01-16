@@ -57,14 +57,14 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
 
   return (
     <div
-      className="relative w-full aspect-video group"
+      className="relative w-full h-full group overflow-hidden bg-black"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
       <iframe
         ref={iframeRef}
         src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0`}
-        className="w-full h-full"
+        className="absolute inset-0 w-full h-full block border-0 bg-black"
         frameBorder="0"
         allow="autoplay; fullscreen; picture-in-picture"
       />
