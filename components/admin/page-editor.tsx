@@ -92,6 +92,24 @@ function pxToGridY(px: number) {
   return Math.max(0, Math.round(px / GRID_ROW));
 }
 
+function clampGridX(x: number, w: number) {
+  return Math.max(0, Math.min(GRID_COLS - w, x));
+}
+
+function isOverlapping(
+  currentId: string,
+  next: { x: number; y: number; w: number; h: number },
+  blocks: ContentBlock[]
+) {
+  return blocks.some((block) => {
+    if (block.id === currentId) return false;
+    const other = block.layout;
+    const overlapX = next.x < other.x + other.w && next.x + next.w > other.x;
+    const overlapY = next.y < other.y + other.h && next.y + next.h > other.y;
+    return overlapX && overlapY;
+  });
+}
+
 function normalizeInitialBlocks(blocks: ContentBlock[]) {
   const seen = new Set<string>();
   return blocks.map((block) => {
@@ -245,6 +263,20 @@ export function PageEditor({
     });
   }, [blocks]);
 
+  useEffect(() => {
+    setBlocks((prev) => {
+      let changed = false;
+      const next = prev.map((block) => {
+        if (block.block_type !== 'vimeo') return block;
+        const nextH = Math.max(1, Math.round(block.layout.w / (16 / 9)));
+        if (block.layout.h === nextH) return block;
+        changed = true;
+        return { ...block, layout: { ...block.layout, h: nextH } };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
   // Auto-save function
   const performSave = useCallback(async () => {
     const draftQuery = draftMode ? '?draft=1' : '';
@@ -389,7 +421,7 @@ export function PageEditor({
     
     // Simple default sizing
     const blockW = 2;
-    const blockH = 1;
+    const blockH = type === 'vimeo' ? Math.max(1, Math.round(blockW / (16 / 9))) : 1;
 
     const newBlock: ContentBlock = {
       id: createBlockId('temp'),
@@ -800,7 +832,7 @@ export function PageEditor({
             {blocks.map((block) => {
               const ratio = getRatioForBlock(block);
               const widthPx = gridToPxW(block.layout.w, containerWidth);
-              const heightPx = ratio ? widthPx / ratio : gridToPxW(1, containerWidth);
+              const heightPx = gridToPxY(block.layout.h);
               const xPx = gridToPxX(block.layout.x, containerWidth);
               const yPx = gridToPxY(block.layout.y);
 
@@ -816,8 +848,15 @@ export function PageEditor({
                   enableResizing={showEditControls}
                   disableDragging={!showEditControls}
                   onDragStop={(_, data) => {
-                    const nextX = pxToGridX(data.x, containerWidth);
+                    const nextXRaw = pxToGridX(data.x, containerWidth);
                     const nextY = pxToGridY(data.y);
+                    const nextX = clampGridX(nextXRaw, block.layout.w);
+                    const nextLayout = { x: nextX, y: nextY, w: block.layout.w, h: block.layout.h };
+
+                    if (isOverlapping(block.id, nextLayout, blocks)) {
+                      return;
+                    }
+
                     setBlocks((prev) =>
                       prev.map((b) =>
                         b.id === block.id
@@ -828,9 +867,16 @@ export function PageEditor({
                   }}
                   onResizeStop={(_, __, ___, delta, position) => {
                     const nextW = pxToGridW(widthPx + delta.width, containerWidth);
-                    const nextX = pxToGridX(position.x, containerWidth);
-                    const nextY = pxToGridY(position.y);
                     const nextH = ratio ? Math.max(1, Math.round(nextW / ratio)) : block.layout.h;
+                    const nextXRaw = pxToGridX(position.x, containerWidth);
+                    const nextX = clampGridX(nextXRaw, nextW);
+                    const nextY = pxToGridY(position.y);
+                    const nextLayout = { x: nextX, y: nextY, w: nextW, h: nextH };
+
+                    if (isOverlapping(block.id, nextLayout, blocks)) {
+                      return;
+                    }
+
                     setBlocks((prev) =>
                       prev.map((b) =>
                         b.id === block.id
