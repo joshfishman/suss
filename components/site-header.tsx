@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { AdminEditToggle } from '@/components/admin/admin-edit-toggle';
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -21,7 +22,7 @@ export function SiteHeader() {
             the Suss
           </Link>
           
-          <div className="flex gap-12">
+          <div className="flex items-center gap-6 md:gap-12">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -36,6 +37,7 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
+            <AdminEditToggle />
           </div>
         </div>
       </nav>
