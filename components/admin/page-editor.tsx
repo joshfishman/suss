@@ -1055,7 +1055,20 @@ export function PageEditor({
                   resizeGrid={[colWidth(containerWidth) + GRID_GAP, 1]}
                   minWidth={gridToPxW(1, containerWidth)}
                   maxWidth={gridToPxW(GRID_COLS, containerWidth)}
-                  enableResizing={!readOnly && showEditControls}
+                  enableResizing={
+                    !readOnly && showEditControls
+                      ? {
+                          top: false,
+                          right: true,
+                          bottom: true,
+                          left: false,
+                          topRight: false,
+                          bottomRight: false,
+                          bottomLeft: false,
+                          topLeft: false,
+                        }
+                      : false
+                  }
                   disableDragging={readOnly || !showEditControls}
                   onDragStop={(_, data) => {
                     const nextXRaw = pxToGridX(data.x, containerWidth);
@@ -1158,7 +1171,33 @@ export function PageEditor({
                               </Button>
                             </div>
                           </div>
-                        ) : null}
+                        ) : (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end gap-2 pointer-events-none">
+                            <div className="flex gap-2 pointer-events-auto">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectExisting(block);
+                                }}
+                                className="bg-white text-black hover:bg-gray-100"
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBlock(block.id);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
