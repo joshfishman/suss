@@ -1,73 +1,91 @@
-import { Suspense } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
-import { PageEditor } from '@/components/admin/page-editor';
-import { getPageData } from '@/lib/drafts';
+import { BlockRenderer } from '@/components/content-blocks/block-renderer';
+import { PageShell } from '@/components/page-shell';
+import { ContentBlock } from '@/lib/types/content';
 
-async function PageContent({ editMode }: { editMode: boolean }) {
+async function getProjects() {
   const supabase = await createClient();
 
-  if (editMode) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      redirect('/auth/login');
+  let { data: pages, error: pagesError } = await supabase
+    .from('pages')
+    .select('*')
+    .eq('page_type', 'project')
+    .order('created_at', { ascending: false });
+
+  if (pagesError && /page_type/i.test(pagesError.message)) {
+    const fallback = await supabase
+      .from('pages')
+      .select('*')
+      .order('created_at', { ascending: false });
+    pages = fallback.data || [];
+    pagesError = fallback.error;
+  }
+
+  if (pagesError || !pages?.length) {
+    return [];
+  }
+
+  const filteredPages = pages.filter(
+    (page) => page.page_type === 'project' || page.slug?.startsWith('project-')
+  );
+  if (!filteredPages.length) {
+    return [];
+  }
+
+  const pageIds = filteredPages.map((page) => page.id);
+  const { data: blocks } = await supabase
+    .from('content_blocks')
+    .select('*')
+    .in('page_id', pageIds)
+    .order('sort_order', { ascending: true });
+
+  const firstBlockByPage = new Map<string, ContentBlock>();
+  for (const block of blocks || []) {
+    if (!firstBlockByPage.has(block.page_id)) {
+      firstBlockByPage.set(block.page_id, block as ContentBlock);
     }
   }
 
-  const { page, blocks } = await getPageData('projects', editMode);
-
-  if (!page) {
-    return <div>Page not found</div>;
-  }
-
-  if (editMode) {
-    return (
-      <PageEditor
-        page={page}
-        initialBlocks={blocks || []}
-        draftMode
-        editOnPublic
-        exitHref="/projects"
-      />
-    );
-  }
-
-  return (
-    <PageEditor
-      page={page}
-      initialBlocks={blocks || []}
-      readOnly
-    />
-  );
+  return filteredPages.map((page) => ({
+    id: page.id,
+    slug: page.slug,
+    title: page.title,
+    description: page.description || '',
+    first_block: firstBlockByPage.get(page.id) || null,
+  }));
 }
 
-function isEditMode(searchParams?: { edit?: string | string[] }) {
-  const editParam = searchParams?.edit;
-  if (Array.isArray(editParam)) {
-    return editParam.includes('1') || editParam.includes('true');
-  }
-  return editParam === '1' || editParam === 'true';
-}
-
-export default async function ProjectsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ edit?: string | string[] }>;
-}) {
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const editMode = isEditMode(resolvedSearchParams);
-
-  if (editMode) {
-    return (
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-        <PageContent editMode />
-      </Suspense>
-    );
-  }
+export default async function ProjectsPage() {
+  const projects = await getProjects();
 
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-      <PageContent editMode={false} />
-    </Suspense>
+    <PageShell>
+      <section className="container mx-auto px-8 pb-24">
+        <div className="mb-6">
+          <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white">Projects</h2>
+        </div>
+        {projects.length === 0 ? (
+          <p className="text-white/60 text-sm">No projects yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {projects.map((project) => (
+              <Link key={project.id} href={`/projects/${project.slug}`} className="group">
+                <div className="mb-3 text-lg font-light text-white">{project.title}</div>
+                {project.first_block ? (
+                  <div className="rounded-lg overflow-hidden bg-black">
+                    <BlockRenderer block={project.first_block} />
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-white/5 text-white/60 text-sm p-6">
+                    No preview yet
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    </PageShell>
   );
 }
