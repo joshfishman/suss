@@ -30,6 +30,7 @@ function ImageSizeCollector({
   onChange: (sizes: Record<string, { width: number; height: number }>) => void;
 }) {
   useEffect(() => {
+    console.log('[image-measurer] collector sizes', sizes);
     onChange(sizes);
   }, [sizes, onChange]);
 
@@ -118,7 +119,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   }, []);
 
   const imageItems = useMemo<ImageItem[]>(() => {
-    return blocks
+    const items = blocks
       .filter((block) => block.block_type === 'image')
       .map((block) => {
         const content = block.content as { url?: string };
@@ -127,12 +128,14 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
           : null;
       })
       .filter((item): item is ImageItem => Boolean(item));
+    console.log('[image-measurer] imageItems', items);
+    return items;
   }, [blocks]);
 
   const handleSizesChange = useCallback(
     (sizes: Record<string, { width: number; height: number }>) => {
       if (sizesChanged(measuredSizes, sizes)) {
-        console.debug('[image-measurer] sizes', sizes);
+        console.log('[image-measurer] sizes', sizes);
         setMeasuredSizes(sizes);
       }
     },
@@ -157,7 +160,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
         const ratio = size.width / size.height;
         const newH = Math.max(1, Math.round(block.layout.w / ratio));
-        console.debug('[image-measurer] apply ratio', {
+        console.log('[image-measurer] apply ratio', {
           url: content.url,
           ratio,
           w: block.layout.w,
