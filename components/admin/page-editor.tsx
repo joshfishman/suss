@@ -556,42 +556,50 @@ export function PageEditor({
     [getBlockHeightPx]
   );
 
-  const reflowLTR = useCallback(
+  const packMasonry = useCallback(
     (nextBlocks: ContentBlock[]) => {
       const ordered = [...nextBlocks].sort((a, b) => {
         if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
         return a.layout.x - b.layout.x;
       });
 
+      const colHeights = Array.from({ length: GRID_COLS }, () => 0);
       const resolvedById = new Map<string, ContentBlock>();
-      let cursorX = 0;
-      let cursorY = 0;
-      let rowMaxH = 0;
       let changed = false;
 
       for (const block of ordered) {
-        const blockH = getBlockHeightPx(block);
-        if (cursorX + block.layout.w > GRID_COLS) {
-          cursorY = cursorY + rowMaxH + GRID_GAP;
-          cursorX = 0;
-          rowMaxH = 0;
+        const blockW = Math.min(Math.max(block.layout.w, 1), GRID_COLS);
+        let bestX = 0;
+        let bestY = Number.POSITIVE_INFINITY;
+
+        for (let x = 0; x <= GRID_COLS - blockW; x += 1) {
+          const spanHeights = colHeights.slice(x, x + blockW);
+          const candidateY = Math.max(...spanHeights);
+          if (candidateY < bestY) {
+            bestY = candidateY;
+            bestX = x;
+          }
         }
 
-        if (block.layout.x !== cursorX || block.layout.y !== cursorY) {
+        const nextY = Number.isFinite(bestY) ? bestY : 0;
+        if (block.layout.x !== bestX || block.layout.y !== nextY) {
           changed = true;
         }
 
-        const nextBlock = {
+        const blockH = getBlockHeightPx(block);
+        const nextBottom = nextY + blockH + GRID_GAP;
+        for (let i = bestX; i < bestX + blockW; i += 1) {
+          colHeights[i] = nextBottom;
+        }
+
+        resolvedById.set(block.id, {
           ...block,
           layout: {
             ...block.layout,
-            x: cursorX,
-            y: cursorY,
+            x: bestX,
+            y: nextY,
           },
-        };
-        resolvedById.set(block.id, nextBlock);
-        cursorX += block.layout.w;
-        rowMaxH = Math.max(rowMaxH, blockH);
+        });
       }
 
       if (!changed) return nextBlocks;
@@ -607,31 +615,31 @@ export function PageEditor({
       }
 
       const normalized =
-        layoutMode === 'snap' ? reflowLTR(existingBlocks) : existingBlocks;
+        layoutMode === 'snap' ? packMasonry(existingBlocks) : existingBlocks;
 
-      const rows = new Map<number, { endX: number; maxH: number }>();
+      const colHeights = Array.from({ length: GRID_COLS }, () => 0);
       for (const block of normalized) {
-        const rowKey = block.layout.y;
         const blockH = getBlockHeightPx(block);
-        const current = rows.get(rowKey) || { endX: 0, maxH: 0 };
-        rows.set(rowKey, {
-          endX: Math.max(current.endX, block.layout.x + block.layout.w),
-          maxH: Math.max(current.maxH, blockH),
-        });
-      }
-
-      const rowEntries = [...rows.entries()].sort((a, b) => a[0] - b[0]);
-      for (const [rowY, info] of rowEntries) {
-        if (info.endX + blockW <= GRID_COLS) {
-          return { x: info.endX, y: rowY };
+        const bottom = block.layout.y + blockH + GRID_GAP;
+        for (let i = block.layout.x; i < block.layout.x + block.layout.w; i += 1) {
+          colHeights[i] = Math.max(colHeights[i], bottom);
         }
       }
 
-      const lastRow = rowEntries[rowEntries.length - 1];
-      const nextY = lastRow ? lastRow[0] + lastRow[1].maxH + GRID_GAP : 0;
-      return { x: 0, y: nextY };
+      let bestX = 0;
+      let bestY = Number.POSITIVE_INFINITY;
+      for (let x = 0; x <= GRID_COLS - blockW; x += 1) {
+        const spanHeights = colHeights.slice(x, x + blockW);
+        const candidateY = Math.max(...spanHeights);
+        if (candidateY < bestY) {
+          bestY = candidateY;
+          bestX = x;
+        }
+      }
+
+      return { x: bestX, y: Number.isFinite(bestY) ? bestY : 0 };
     },
-    [blocks, getBlockHeightPx, layoutMode, reflowLTR]
+    [blocks, getBlockHeightPx, layoutMode, packMasonry]
   );
 
   useEffect(() => {
@@ -645,9 +653,9 @@ export function PageEditor({
         return { ...block, layout: { ...block.layout, h: nextH } };
       });
       if (!changed) return prev;
-      return layoutMode === 'snap' ? reflowLTR(next) : next;
+      return layoutMode === 'snap' ? packMasonry(next) : next;
     });
-  }, [containerWidth, layoutMode, reflowLTR]);
+  }, [containerWidth, layoutMode, packMasonry]);
 
   useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
@@ -686,9 +694,9 @@ export function PageEditor({
       });
 
       if (!changed) return prev;
-      return layoutMode === 'snap' ? reflowLTR(next) : next;
+      return layoutMode === 'snap' ? packMasonry(next) : next;
     });
-  }, [measuredSizes, containerWidth, layoutMode, reflowLTR]);
+  }, [measuredSizes, containerWidth, layoutMode, packMasonry]);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     const blockId = createBlockId('block');
@@ -1186,7 +1194,7 @@ export function PageEditor({
                           ? { ...b, layout: { ...b.layout, x: resolvedLayout.x, y: resolvedLayout.y } }
                           : b
                       );
-                      return layoutMode === 'snap' ? reflowLTR(next) : next;
+                      return layoutMode === 'snap' ? packMasonry(next) : next;
                     });
                   }}
                   onResizeStop={(_, __, ref, _delta, position) => {
@@ -1214,7 +1222,7 @@ export function PageEditor({
                             }
                           : b
                       );
-                      return layoutMode === 'snap' ? reflowLTR(next) : next;
+                      return layoutMode === 'snap' ? packMasonry(next) : next;
                     });
                   }}
                 >
