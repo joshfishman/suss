@@ -20,10 +20,15 @@ export function TextBlock({ content, isEditing = false }: TextBlockProps) {
   };
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center px-0 py-4">
+    <div
+      className="relative w-full h-full flex items-center justify-start px-0 py-4"
+      dir="ltr"
+      style={{ direction: 'ltr', textAlign: 'left' }}
+    >
       <div
         dir="ltr"
-        className={`${getClassName()} text-left`}
+        className={`${getClassName()} text-left w-full`}
+        style={{ direction: 'ltr', textAlign: 'left' }}
         dangerouslySetInnerHTML={{ __html: content.html }}
       />
       {isEditing && (
