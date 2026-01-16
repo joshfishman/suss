@@ -10,6 +10,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
   return (
     <div className="relative w-full h-full flex flex-col justify-center p-6 bg-black text-white">
       <h3
+        dir="ltr"
         contentEditable={isEditing}
         suppressContentEditableWarning
         onInput={(e) => {
@@ -19,13 +20,14 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
             header: e.currentTarget.textContent || '',
           });
         }}
-        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2"
+        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
         data-placeholder="Header"
       >
         {content.header || ''}
       </h3>
       {content.description ? (
         <p
+          dir="ltr"
           contentEditable={isEditing}
           suppressContentEditableWarning
           onInput={(e) => {
@@ -35,13 +37,14 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
               description: e.currentTarget.textContent || '',
             });
           }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2"
+          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
           data-placeholder="Description"
         >
           {content.description}
         </p>
       ) : isEditing ? (
         <p
+          dir="ltr"
           contentEditable
           suppressContentEditableWarning
           onInput={(e) => {
@@ -51,7 +54,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
               description: e.currentTarget.textContent || '',
             });
           }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2"
+          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
           data-placeholder="Description"
         >
           {content.description || ''}
