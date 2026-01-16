@@ -5,6 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { Rnd } from 'react-rnd';
 import { Page, ContentBlock } from '@/lib/types/content';
+import {
+  GRID_COLS,
+  GRID_GAP,
+  clampGridX,
+  colWidth,
+  gridToPxW,
+  gridToPxX,
+  gridToPxY,
+  pxToGridW,
+  pxToGridX,
+  ratioToPxH,
+} from '@/lib/grid';
 import { BlockRenderer } from '@/components/content-blocks/block-renderer';
 import { BlockEditorModal } from './block-editor-modal';
 import { Button } from '@/components/ui/button';
@@ -44,41 +56,6 @@ function sizesChanged(
   return false;
 }
 
-const GRID_COLS = 4;
-const GRID_GAP = 32; // 2rem gap
-
-function colWidth(containerWidth: number) {
-  return (containerWidth - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
-}
-
-function gridToPxX(x: number, containerWidth: number) {
-  return x * colWidth(containerWidth) + x * GRID_GAP;
-}
-
-function gridToPxW(w: number, containerWidth: number) {
-  return w * colWidth(containerWidth) + (w - 1) * GRID_GAP;
-}
-
-function pxToGridX(px: number, containerWidth: number) {
-  return Math.max(0, Math.min(GRID_COLS - 1, Math.round(px / (colWidth(containerWidth) + GRID_GAP))));
-}
-
-function pxToGridW(px: number, containerWidth: number) {
-  return Math.max(1, Math.min(GRID_COLS, Math.round((px + GRID_GAP) / (colWidth(containerWidth) + GRID_GAP))));
-}
-
-function gridToPxY(y: number) {
-  return y * (320 + GRID_GAP);
-}
-
-function ratioToPxH(w: number, ratio: number, containerWidth: number) {
-  const widthPx = gridToPxW(w, containerWidth);
-  return Math.max(80, Math.round(widthPx / ratio));
-}
-
-function clampGridX(x: number, w: number) {
-  return Math.max(0, Math.min(GRID_COLS - w, x));
-}
 
 function isOverlapping(
   currentId: string,
@@ -150,6 +127,7 @@ export function PageEditor({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
   const lastAttemptRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
   const lastAttemptHashRef = useRef(JSON.stringify(initialBlocks));
@@ -231,9 +209,17 @@ export function PageEditor({
       }
     };
 
-    loadImages();
+    if (measureTimeoutRef.current) {
+      clearTimeout(measureTimeoutRef.current);
+    }
+    measureTimeoutRef.current = setTimeout(() => {
+      loadImages();
+    }, 200);
     return () => {
       cancelled = true;
+      if (measureTimeoutRef.current) {
+        clearTimeout(measureTimeoutRef.current);
+      }
     };
   }, [imageItems]);
 
@@ -304,7 +290,7 @@ export function PageEditor({
       });
       return changed ? next : prev;
     });
-  }, [blocks, containerWidth]);
+  }, [containerWidth]);
 
   // Auto-save function
   const performSave = useCallback(async () => {
@@ -511,17 +497,63 @@ export function PageEditor({
     [isOverlappingWithRatios]
   );
 
+  const resolveAllOverlaps = useCallback(
+    (nextBlocks: ContentBlock[]) => {
+      const sorted = [...nextBlocks].sort((a, b) => {
+        if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
+        return a.layout.x - b.layout.x;
+      });
+      const placed: ContentBlock[] = [];
+      const resolvedById = new Map<string, ContentBlock>();
+      let changed = false;
+
+      for (const block of sorted) {
+        let candidate = { ...block, layout: { ...block.layout } };
+        let safety = 0;
+        const overlapsAny = (item: ContentBlock) => {
+          const itemH = getBlockHeightPx(item);
+          return placed.some((other) => {
+            const otherH = getBlockHeightPx(other);
+            const overlapX =
+              item.layout.x < other.layout.x + other.layout.w &&
+              item.layout.x + item.layout.w > other.layout.x;
+            const overlapY =
+              item.layout.y < other.layout.y + otherH + GRID_GAP &&
+              item.layout.y + itemH + GRID_GAP > other.layout.y;
+            return overlapX && overlapY;
+          });
+        };
+
+        while (overlapsAny(candidate) && safety < 200) {
+          candidate = { ...candidate, layout: { ...candidate.layout, y: candidate.layout.y + GRID_GAP } };
+          safety += 1;
+        }
+
+        if (candidate.layout.y !== block.layout.y) {
+          changed = true;
+        }
+
+        placed.push(candidate);
+        resolvedById.set(candidate.id, candidate);
+      }
+
+      if (!changed) return nextBlocks;
+      return nextBlocks.map((block) => resolvedById.get(block.id) ?? block);
+    },
+    [getBlockHeightPx]
+  );
+
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     // Find first row (y=0) and calculate used width there
     const firstRowBlocks = blocks.filter(b => b.layout.y === 0);
     const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
     
     // If there's space in the first row, add there; otherwise start a new row
-    const nextX = usedWidth < 4 ? usedWidth : 0;
+    const nextX = usedWidth < GRID_COLS ? usedWidth : 0;
     const maxBottomY = blocks.length
       ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
       : 0;
-    const nextY = usedWidth < 4 ? 0 : maxBottomY;
+    const nextY = usedWidth < GRID_COLS ? 0 : maxBottomY;
 
     const blockId = createBlockId('block');
     
@@ -723,8 +755,8 @@ export function PageEditor({
           const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
           
           // If there's space in first row, add there; otherwise start new row
-          const nextX = usedWidth + blockW <= 4 ? usedWidth : 0;
-          const nextY = usedWidth + blockW <= 4 ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
+          const nextX = usedWidth + blockW <= GRID_COLS ? usedWidth : 0;
+          const nextY = usedWidth + blockW <= GRID_COLS ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
           
           const blockId = createBlockId('block');
           
@@ -969,7 +1001,7 @@ export function PageEditor({
                   dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_GAP]}
                   resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_GAP]}
                   minWidth={gridToPxW(1, containerWidth)}
-                  maxWidth={gridToPxW(4, containerWidth)}
+                  maxWidth={gridToPxW(GRID_COLS, containerWidth)}
                   enableResizing={!readOnly && showEditControls}
                   disableDragging={readOnly || !showEditControls}
                   onDragStop={(_, data) => {
@@ -980,13 +1012,14 @@ export function PageEditor({
                     const nextLayout = { x: nextX, y: nextY, w: block.layout.w, h: effectiveH };
                     const resolvedLayout = resolveOverlap(block.id, nextLayout);
 
-                    setBlocks((prev) =>
-                      prev.map((b) =>
+                    setBlocks((prev) => {
+                      const next = prev.map((b) =>
                         b.id === block.id
                           ? { ...b, layout: { ...b.layout, x: resolvedLayout.x, y: resolvedLayout.y } }
                           : b
-                      )
-                    );
+                      );
+                      return resolveAllOverlaps(next);
+                    });
                   }}
                   onResizeStop={(_, __, ___, delta, position) => {
                     const nextW = pxToGridW(widthPx + delta.width, containerWidth);
@@ -999,8 +1032,8 @@ export function PageEditor({
                     const nextLayout = { x: nextX, y: nextY, w: nextW, h: nextH };
                     const resolvedLayout = resolveOverlap(block.id, nextLayout);
 
-                    setBlocks((prev) =>
-                      prev.map((b) =>
+                    setBlocks((prev) => {
+                      const next = prev.map((b) =>
                         b.id === block.id
                           ? {
                               ...b,
@@ -1013,8 +1046,9 @@ export function PageEditor({
                               },
                             }
                           : b
-                      )
-                    );
+                      );
+                      return resolveAllOverlaps(next);
+                    });
                   }}
                 >
                   <div
