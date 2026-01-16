@@ -39,7 +39,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <SiteHeader />
-      <main className="pt-20 flex-1">
+      <main className="flex-1">
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
           <PageContent />
         </Suspense>

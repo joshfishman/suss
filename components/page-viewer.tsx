@@ -7,48 +7,35 @@ interface PageViewerProps {
   blocks: ContentBlock[];
 }
 
-const ROW_HEIGHT = 50;
-const GAP = 16;
-
 export function PageViewer({ blocks }: PageViewerProps) {
   if (blocks.length === 0) {
     return null;
   }
 
-  // Convert blocks to grid layout using 4-column system
+  const getColSpanClass = (w: number) => {
+    switch (w) {
+      case 1:
+        return 'col-span-1';
+      case 2:
+        return 'col-span-2';
+      case 3:
+        return 'col-span-3';
+      default:
+        return 'col-span-4';
+    }
+  };
+
   return (
     <div className="container mx-auto px-8">
-      <div className="relative w-full">
-        {blocks.map((block) => {
-          const { x, y, w, h } = block.layout;
-          
-          // Calculate positioning based on a 4-column grid with 50px rows
-          const leftPercent = (x / 4) * 100;
-          const widthPercent = (w / 4) * 100;
-          const topPx = y * ROW_HEIGHT + y * GAP;
-          const heightPx = h * ROW_HEIGHT + (h - 1) * GAP;
-
-          return (
-            <div
-              key={block.id}
-              className="absolute rounded-lg overflow-hidden"
-              style={{
-                left: `calc(${leftPercent}% + ${x * (GAP / 4)}px)`,
-                top: `${topPx}px`,
-                width: `calc(${widthPercent}% - ${GAP - (w * (GAP / 4))}px)`,
-                height: `${heightPx}px`,
-              }}
-            >
-              <BlockRenderer block={block} />
-            </div>
-          );
-        })}
-        {/* Add spacer for total height */}
-        <div
-          style={{
-            height: `${Math.max(...blocks.map(b => (b.layout.y + b.layout.h) * ROW_HEIGHT + b.layout.y * GAP))}px`,
-          }}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {blocks.map((block) => (
+          <div
+            key={block.id}
+            className={`rounded-lg overflow-hidden ${getColSpanClass(block.layout.w)} md:${getColSpanClass(block.layout.w)}`}
+          >
+            <BlockRenderer block={block} />
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full aspect-video">
       <iframe
         src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0`}
         className="w-full h-full"

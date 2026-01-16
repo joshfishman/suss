@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { ImageContent } from '@/lib/types/content';
 import { ImageIcon } from 'lucide-react';
 
@@ -28,16 +27,12 @@ export function ImageBlock({ content, isEditing = false }: ImageBlockProps) {
   }
 
   return (
-    <div className="relative w-full h-full group">
-      <div className="relative w-full h-full overflow-hidden">
-        <Image
-          src={content.url}
-          alt={content.alt || ''}
-          fill
-          className="object-contain w-full h-full"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
-      </div>
+    <div className="relative w-full group">
+      <img
+        src={content.url}
+        alt={content.alt || ''}
+        className="w-full h-auto object-contain"
+      />
       {content.caption && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm">
           {content.caption}
