@@ -1029,8 +1029,6 @@ export function PageEditor({
                     const nextXRaw = pxToGridX(position.x, containerWidth);
                     const nextX = clampGridX(nextXRaw, nextW);
                     const nextY = Math.max(0, position.y);
-                    const nextLayout = { x: nextX, y: nextY, w: nextW, h: nextH };
-                    const resolvedLayout = resolveOverlap(block.id, nextLayout);
 
                     setBlocks((prev) => {
                       const next = prev.map((b) =>
@@ -1039,10 +1037,10 @@ export function PageEditor({
                               ...b,
                               layout: {
                                 ...b.layout,
-                                w: resolvedLayout.w,
-                                h: resolvedLayout.h,
-                                x: resolvedLayout.x,
-                                y: resolvedLayout.y,
+                                w: nextW,
+                                h: nextH,
+                                x: nextX,
+                                y: nextY,
                               },
                             }
                           : b
