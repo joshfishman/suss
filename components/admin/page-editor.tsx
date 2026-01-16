@@ -1174,6 +1174,7 @@ export function PageEditor({
                     onDrop={(event) => {
                       if (block.block_type !== 'image') return;
                       event.preventDefault();
+                      event.stopPropagation();
                       const file = event.dataTransfer?.files?.[0];
                       if (file) {
                         handleUploadToBlock(block, file);
