@@ -11,38 +11,60 @@ interface VimeoBlockProps {
 }
 
 export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const playerRef = useRef<Player | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
 
-  const ensurePlayer = useCallback(() => {
-    if (!iframeRef.current || !content.vimeo_id) return null;
-    if (!playerRef.current) {
+  const initPlayer = useCallback(() => {
+    if (!iframeRef.current || !content.vimeo_id || playerRef.current) return;
+    try {
       playerRef.current = new Player(iframeRef.current);
       playerRef.current.on('play', () => setIsPlaying(true));
       playerRef.current.on('pause', () => setIsPlaying(false));
       playerRef.current.on('ended', () => setIsPlaying(false));
+      playerRef.current.ready().then(() => setPlayerReady(true));
+    } catch (error) {
+      console.error('Failed to init Vimeo player:', error);
     }
-    return playerRef.current;
   }, [content.vimeo_id]);
 
   useEffect(() => {
-    const player = ensurePlayer();
+    // Initialize player immediately when component mounts
+    const timer = setTimeout(() => {
+      initPlayer();
+    }, 100);
     return () => {
-      player?.destroy();
-      playerRef.current = null;
+      clearTimeout(timer);
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
     };
-  }, [ensurePlayer]);
+  }, [initPlayer]);
 
   const handleTogglePlay = async () => {
-    const player = ensurePlayer();
-    if (!player) return;
+    if (!playerRef.current) {
+      initPlayer();
+      // Wait a bit for player to initialize then play
+      setTimeout(async () => {
+        if (playerRef.current) {
+          try {
+            await playerRef.current.play();
+          } catch (error) {
+            console.error('Vimeo playback failed:', error);
+          }
+        }
+      }, 200);
+      return;
+    }
     try {
       if (isPlaying) {
-        await player.pause();
+        await playerRef.current.pause();
       } else {
-        await player.play();
+        await playerRef.current.play();
       }
     } catch (error) {
       console.error('Vimeo playback failed:', error);
@@ -70,7 +92,13 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
 
   return (
     <div
-      className={`relative w-full group overflow-hidden bg-black ${isEditing ? 'h-full' : 'aspect-video'}`}
+      ref={containerRef}
+      className="relative w-full group overflow-hidden bg-black"
+      style={{
+        // Use paddingBottom trick for aspect ratio when not in editor
+        paddingBottom: isEditing ? undefined : '56.25%',
+        height: isEditing ? '100%' : 0,
+      }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onClick={() => {
@@ -81,14 +109,8 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
     >
       <iframe
         ref={iframeRef}
-        src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0`}
-        className="absolute block border-0 bg-black z-0 pointer-events-none"
-        style={{
-          top: -1,
-          left: -1,
-          width: 'calc(100% + 2px)',
-          height: 'calc(100% + 2px)',
-        }}
+        src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0&background=0`}
+        className="absolute top-0 left-0 w-full h-full border-0 bg-black z-0 pointer-events-none"
         frameBorder="0"
         allow="autoplay; fullscreen; picture-in-picture"
       />
@@ -106,12 +128,12 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
         {isPlaying ? <Pause className="w-10 h-10" /> : <Play className="w-10 h-10" />}
       </button>
       {content.caption && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm">
+        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm z-20">
           {content.caption}
         </div>
       )}
       {isEditing && (
-        <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
+        <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded z-20">
           Vimeo
         </div>
       )}

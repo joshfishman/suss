@@ -1555,7 +1555,7 @@ export function PageEditor({
         </div>
 
         {page.slug === 'home' && (
-          <section className="container mx-auto px-8 pb-24">
+          <section className="container mx-auto px-8 pb-24" style={{ direction: 'ltr', textAlign: 'left' }}>
             <div className="mb-6">
               <h2 className="text-2xl md:text-3xl font-light tracking-tight">Projects</h2>
             </div>
@@ -1568,10 +1568,11 @@ export function PageEditor({
                   const isVimeo = firstBlock?.block_type === 'vimeo';
 
                   return (
-                    <div key={project.id} className="group">
+                    <div key={project.id} className="group" style={{ direction: 'ltr', textAlign: 'left' }}>
                       <Link
                         href={`/${project.slug}`}
                         className="mb-3 text-lg font-light inline-flex text-white hover:text-white/90"
+                        style={{ direction: 'ltr' }}
                       >
                         {project.title}
                       </Link>

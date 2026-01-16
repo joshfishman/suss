@@ -61,12 +61,18 @@ export default async function ProjectsPage() {
 
   return (
     <PageShell>
-      <section className="container mx-auto px-8 pb-24" dir="ltr" style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}>
-        <div className="mb-10">
-          <h1 className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 text-white">
+      <section className="container mx-auto px-8 pb-24">
+        <div className="mb-10" style={{ direction: 'ltr', textAlign: 'left' }}>
+          <h1
+            className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 text-white"
+            style={{ direction: 'ltr', textAlign: 'left' }}
+          >
             Projects
           </h1>
-          <p className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl">
+          <p
+            className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl"
+            style={{ direction: 'ltr', textAlign: 'left' }}
+          >
             A curated selection of our latest work.
           </p>
         </div>
@@ -79,8 +85,12 @@ export default async function ProjectsPage() {
               const isVimeo = firstBlock?.block_type === 'vimeo';
 
               return (
-                <div key={project.id} className="group">
-                  <Link href={`/${project.slug}`} className="mb-3 text-lg font-light text-white inline-flex">
+                <div key={project.id} className="group" style={{ direction: 'ltr', textAlign: 'left' }}>
+                  <Link
+                    href={`/${project.slug}`}
+                    className="mb-3 text-lg font-light text-white inline-flex"
+                    style={{ direction: 'ltr' }}
+                  >
                     {project.title}
                   </Link>
                   {firstBlock ? (
