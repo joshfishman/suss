@@ -106,6 +106,7 @@ export function PageEditor({
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [showEditControls, setShowEditControls] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
@@ -572,8 +573,19 @@ export function PageEditor({
         </div>
       )}
 
+      {/* Edit toggle */}
+      {editOnPublic && (
+        <button
+          type="button"
+          onClick={() => setShowEditControls((prev) => !prev)}
+          className="fixed bottom-6 right-6 z-[70] bg-white text-black px-4 py-2 rounded-full text-sm font-medium shadow-lg hover:bg-gray-100"
+        >
+          {showEditControls ? 'Hide Edit' : 'Edit'}
+        </button>
+      )}
+
       {/* Admin toolbar - fixed bottom to keep public layout intact */}
-      <div className="fixed bottom-0 left-0 right-0 z-[60] bg-black text-white">
+      <div className={`fixed bottom-0 left-0 right-0 z-[60] bg-black text-white ${showEditControls || !editOnPublic ? '' : 'hidden'}`}>
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -726,31 +738,33 @@ export function PageEditor({
                 className="relative rounded-lg overflow-hidden bg-gray-100 group"
               >
                 <BlockRenderer block={block} isEditing />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditBlock(block);
-                      }}
-                      className="bg-white text-black hover:bg-gray-100"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteBlock(block.id);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                {(showEditControls || !editOnPublic) && (
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditBlock(block);
+                        }}
+                        className="bg-white text-black hover:bg-gray-100"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteBlock(block.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </GridLayout>
