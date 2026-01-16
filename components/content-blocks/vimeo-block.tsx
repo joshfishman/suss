@@ -98,6 +98,8 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
         // Use paddingBottom trick for aspect ratio when not in editor
         paddingBottom: isEditing ? undefined : '56.25%',
         height: isEditing ? '100%' : 0,
+        // Inset shadow to cover any edge artifacts
+        boxShadow: 'inset 0 0 0 1px black',
       }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
@@ -110,13 +112,7 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
       <iframe
         ref={iframeRef}
         src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0&background=0`}
-        className="absolute border-0 bg-black z-0 pointer-events-none"
-        style={{
-          top: -2,
-          left: -2,
-          width: 'calc(100% + 4px)',
-          height: 'calc(100% + 4px)',
-        }}
+        className="absolute top-0 left-0 w-full h-full border-0 bg-black z-0 pointer-events-none"
         frameBorder="0"
         allow="autoplay; fullscreen; picture-in-picture"
       />
