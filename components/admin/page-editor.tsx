@@ -1383,6 +1383,7 @@ export function PageEditor({
                                     ...block,
                                     content: {
                                       ...content,
+                                      url: content.url || '',
                                       alt: e.target.value,
                                     },
                                   });
@@ -1399,6 +1400,7 @@ export function PageEditor({
                                     ...block,
                                     content: {
                                       ...content,
+                                      url: content.url || '',
                                       caption: e.target.value,
                                     },
                                   });
