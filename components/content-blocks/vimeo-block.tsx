@@ -67,7 +67,6 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
         className="w-full h-full"
         frameBorder="0"
         allow="autoplay; fullscreen; picture-in-picture"
-        allowFullScreen
       />
       {(isHovering || isEditing) && (
         <button
