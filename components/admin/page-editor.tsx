@@ -1000,8 +1000,8 @@ export function PageEditor({
                   size={{ width: widthPx, height: heightPx }}
                   position={{ x: xPx, y: yPx }}
                   lockAspectRatio={ratio ?? false}
-                  dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_GAP]}
-                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_GAP]}
+                  dragGrid={[colWidth(containerWidth) + GRID_GAP, 1]}
+                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, 1]}
                   minWidth={gridToPxW(1, containerWidth)}
                   maxWidth={gridToPxW(GRID_COLS, containerWidth)}
                   enableResizing={!readOnly && showEditControls}
