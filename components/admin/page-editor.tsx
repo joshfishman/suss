@@ -875,6 +875,21 @@ export function PageEditor({
     []
   );
 
+  const handleUpdateHeaderField = useCallback((blockId: string, content: { header: string; description: string }) => {
+    setBlocks((prev) =>
+      prev.map((block) => {
+        if (block.id !== blockId || block.block_type !== 'header') return block;
+        return {
+          ...block,
+          content: {
+            header: content.header,
+            description: content.description,
+          },
+        };
+      })
+    );
+  }, []);
+
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !activeUploadBlockId) return;
@@ -1332,7 +1347,11 @@ export function PageEditor({
                       }
                     }}
                   >
-                    <BlockRenderer block={block} isEditing={!readOnly && showEditControls} />
+                    <BlockRenderer
+                      block={block}
+                      isEditing={!readOnly && showEditControls}
+                      onHeaderChange={handleUpdateHeaderField}
+                    />
                     {!readOnly && showEditControls && (
                       <>
                         {block.block_type === 'vimeo' ? (
@@ -1434,8 +1453,8 @@ export function PageEditor({
                             </div>
                           </div>
                         ) : block.block_type === 'header' ? (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex flex-col gap-2 pointer-events-none">
-                            <div className="flex gap-2 pointer-events-auto justify-end">
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
+                            <div className="flex gap-2 pointer-events-auto">
                               <Button
                                 size="sm"
                                 variant="destructive"
@@ -1446,40 +1465,6 @@ export function PageEditor({
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
-                            </div>
-                            <div className="flex flex-col gap-2 pointer-events-auto">
-                              <input
-                                type="text"
-                                placeholder="Header"
-                                value={(block.content as any)?.header || ''}
-                                onChange={(e) => {
-                                  const content = block.content as { header?: string; description?: string };
-                                  handleSaveBlock({
-                                    ...block,
-                                    content: {
-                                      ...content,
-                                      header: e.target.value,
-                                    },
-                                  });
-                                }}
-                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                              />
-                              <input
-                                type="text"
-                                placeholder="Description"
-                                value={(block.content as any)?.description || ''}
-                                onChange={(e) => {
-                                  const content = block.content as { header?: string; description?: string };
-                                  handleSaveBlock({
-                                    ...block,
-                                    content: {
-                                      ...content,
-                                      description: e.target.value,
-                                    },
-                                  });
-                                }}
-                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                              />
                             </div>
                           </div>
                         ) : null}

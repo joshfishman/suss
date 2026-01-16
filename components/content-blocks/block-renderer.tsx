@@ -9,9 +9,10 @@ import { HeaderBlock } from './header-block';
 interface BlockRendererProps {
   block: ContentBlock;
   isEditing?: boolean;
+  onHeaderChange?: (blockId: string, content: HeaderContent) => void;
 }
 
-export function BlockRenderer({ block, isEditing = false }: BlockRendererProps) {
+export function BlockRenderer({ block, isEditing = false, onHeaderChange }: BlockRendererProps) {
   switch (block.block_type) {
     case 'image':
       return <ImageBlock content={block.content as ImageContent} isEditing={isEditing} />;
@@ -20,7 +21,13 @@ export function BlockRenderer({ block, isEditing = false }: BlockRendererProps) 
     case 'text':
       return <TextBlock content={block.content as TextContent} isEditing={isEditing} />;
     case 'header':
-      return <HeaderBlock content={block.content as HeaderContent} isEditing={isEditing} />;
+      return (
+        <HeaderBlock
+          content={block.content as HeaderContent}
+          isEditing={isEditing}
+          onChange={(content) => onHeaderChange?.(block.id, content)}
+        />
+      );
     default:
       return null;
   }
