@@ -46,7 +46,6 @@ function sizesChanged(
 
 const GRID_COLS = 4;
 const GRID_GAP = 32; // 2rem gap
-const GRID_ROW = 320; // 20rem row snap
 
 function colWidth(containerWidth: number) {
   return (containerWidth - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
@@ -69,16 +68,12 @@ function pxToGridW(px: number, containerWidth: number) {
 }
 
 function gridToPxY(y: number) {
-  return y * (GRID_ROW + GRID_GAP);
+  return y * (320 + GRID_GAP);
 }
 
-function pxToGridY(px: number) {
-  return Math.max(0, Math.round(px / (GRID_ROW + GRID_GAP)));
-}
-
-function ratioToGridH(w: number, ratio: number, containerWidth: number) {
+function ratioToPxH(w: number, ratio: number, containerWidth: number) {
   const widthPx = gridToPxW(w, containerWidth);
-  return Math.max(1, Math.round((widthPx / ratio) / GRID_ROW));
+  return Math.max(80, Math.round(widthPx / ratio));
 }
 
 function clampGridX(x: number, w: number) {
@@ -107,15 +102,17 @@ function normalizeInitialBlocks(blocks: ContentBlock[]) {
       key = createBlockId('block');
     }
     seen.add(key);
-    return key === block.layout?.i
-      ? block
-      : {
-          ...block,
-          layout: {
-            ...block.layout,
-            i: key,
-          },
-        };
+    const isLegacyGrid = block.layout?.h <= 10 && block.layout?.y <= 50;
+    const nextLayout = {
+      ...block.layout,
+      i: key,
+      y: isLegacyGrid ? gridToPxY(block.layout.y) : block.layout.y,
+      h: isLegacyGrid ? gridToPxY(block.layout.h) : block.layout.h,
+    };
+    return {
+      ...block,
+      layout: nextLayout,
+    };
   });
 }
 
@@ -244,7 +241,7 @@ export function PageEditor({
           return block;
         }
         imageRatioRef.current[block.layout.i] = ratio;
-        const newH = ratioToGridH(block.layout.w, ratio, containerWidth);
+        const newH = ratioToPxH(block.layout.w, ratio, containerWidth);
         console.log('[image-measurer] apply ratio', {
           url: content.url,
           ratio,
@@ -289,7 +286,7 @@ export function PageEditor({
       let changed = false;
       const next = prev.map((block) => {
         if (block.block_type !== 'vimeo') return block;
-      const nextH = ratioToGridH(block.layout.w, 16 / 9, containerWidth);
+        const nextH = ratioToPxH(block.layout.w, 16 / 9, containerWidth);
         if (block.layout.h === nextH) return block;
         changed = true;
         return { ...block, layout: { ...block.layout, h: nextH } };
@@ -434,12 +431,12 @@ export function PageEditor({
     return null;
   }, [measuredSizes]);
 
-  const getBlockGridH = useCallback(
+  const getBlockHeightPx = useCallback(
     (block: ContentBlock, widthOverride?: number) => {
       const ratio = getRatioForBlock(block);
       const effectiveW = widthOverride ?? block.layout.w;
       if (ratio) {
-        return ratioToGridH(effectiveW, ratio, containerWidth);
+        return ratioToPxH(effectiveW, ratio, containerWidth);
       }
       return block.layout.h;
     },
@@ -450,13 +447,15 @@ export function PageEditor({
     (currentId: string, next: { x: number; y: number; w: number; h: number }) =>
       blocks.some((block) => {
         if (block.id === currentId) return false;
-        const otherH = getBlockGridH(block);
+        const otherH = getBlockHeightPx(block);
         const other = { ...block.layout, h: otherH };
         const overlapX = next.x < other.x + other.w && next.x + next.w > other.x;
-        const overlapY = next.y < other.y + other.h && next.y + next.h > other.y;
+        const overlapY =
+          next.y < other.y + other.h + GRID_GAP &&
+          next.y + next.h + GRID_GAP > other.y;
         return overlapX && overlapY;
       }),
-    [blocks, getBlockGridH]
+    [blocks, getBlockHeightPx]
   );
 
   const resolveOverlap = useCallback(
@@ -464,7 +463,7 @@ export function PageEditor({
       let candidate = { ...next };
       let safety = 0;
       while (isOverlappingWithRatios(currentId, candidate) && safety < 200) {
-        candidate = { ...candidate, y: candidate.y + 1 };
+        candidate = { ...candidate, y: candidate.y + GRID_GAP };
         safety += 1;
       }
       return candidate;
@@ -480,7 +479,7 @@ export function PageEditor({
     // If there's space in the first row, add there; otherwise start a new row
     const nextX = usedWidth < 4 ? usedWidth : 0;
     const maxBottomY = blocks.length
-      ? Math.max(...blocks.map((b) => b.layout.y + getBlockGridH(b)))
+      ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
       : 0;
     const nextY = usedWidth < 4 ? 0 : maxBottomY;
 
@@ -488,7 +487,7 @@ export function PageEditor({
     
     // Simple default sizing
     const blockW = 2;
-    const blockH = type === 'vimeo' ? ratioToGridH(blockW, 16 / 9, containerWidth) : 1;
+    const blockH = type === 'vimeo' ? ratioToPxH(blockW, 16 / 9, containerWidth) : 200;
 
     const newBlock: ContentBlock = {
       id: createBlockId('temp'),
@@ -904,20 +903,18 @@ export function PageEditor({
             style={{
               minHeight: Math.max(
                 400,
-                gridToPxY(
-                  blocks.length
-                    ? Math.max(...blocks.map((b) => b.layout.y + getBlockGridH(b)))
-                    : 1
-                ) - GRID_GAP
+                (blocks.length
+                  ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
+                  : 1) + GRID_GAP
               ),
             }}
           >
             {blocks.map((block) => {
               const ratio = getRatioForBlock(block);
               const widthPx = gridToPxW(block.layout.w, containerWidth);
-              const heightPx = ratio ? widthPx / ratio : gridToPxY(block.layout.h);
+              const heightPx = ratio ? widthPx / ratio : block.layout.h;
               const xPx = gridToPxX(block.layout.x, containerWidth);
-              const yPx = gridToPxY(block.layout.y);
+              const yPx = block.layout.y;
 
               return (
                 <Rnd
@@ -926,17 +923,17 @@ export function PageEditor({
                   size={{ width: widthPx, height: heightPx }}
                   position={{ x: xPx, y: yPx }}
                   lockAspectRatio={ratio ?? false}
-                  dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW + GRID_GAP]}
-                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW + GRID_GAP]}
+                  dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_GAP]}
+                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_GAP]}
                   minWidth={gridToPxW(1, containerWidth)}
                   maxWidth={gridToPxW(4, containerWidth)}
                   enableResizing={!readOnly && showEditControls}
                   disableDragging={readOnly || !showEditControls}
                   onDragStop={(_, data) => {
                     const nextXRaw = pxToGridX(data.x, containerWidth);
-                    const nextY = pxToGridY(data.y);
+                    const nextY = Math.max(0, data.y);
                     const nextX = clampGridX(nextXRaw, block.layout.w);
-                    const effectiveH = getBlockGridH(block, block.layout.w);
+                    const effectiveH = getBlockHeightPx(block, block.layout.w);
                     const nextLayout = { x: nextX, y: nextY, w: block.layout.w, h: effectiveH };
                     const resolvedLayout = resolveOverlap(block.id, nextLayout);
 
@@ -950,10 +947,12 @@ export function PageEditor({
                   }}
                   onResizeStop={(_, __, ___, delta, position) => {
                     const nextW = pxToGridW(widthPx + delta.width, containerWidth);
-                    const nextH = ratio ? ratioToGridH(nextW, ratio, containerWidth) : block.layout.h;
+                    const nextH = ratio
+                      ? ratioToPxH(nextW, ratio, containerWidth)
+                      : Math.max(80, heightPx + delta.height);
                     const nextXRaw = pxToGridX(position.x, containerWidth);
                     const nextX = clampGridX(nextXRaw, nextW);
-                    const nextY = pxToGridY(position.y);
+                    const nextY = Math.max(0, position.y);
                     const nextLayout = { x: nextX, y: nextY, w: nextW, h: nextH };
                     const resolvedLayout = resolveOverlap(block.id, nextLayout);
 
