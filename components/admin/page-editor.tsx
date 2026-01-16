@@ -119,6 +119,7 @@ export function PageEditor({
   const isSavingSyncRef = useRef(false);
   const normalizedImageLayoutsRef = useRef(new Set<string>());
   const [measuredSizes, setMeasuredSizes] = useState<Record<string, { width: number; height: number }>>({});
+  const lastImageUrlByLayoutRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     const updateWidth = () => {
@@ -196,6 +197,21 @@ export function PageEditor({
       return changed ? next : prev;
     });
   }, [measuredSizes]);
+
+  useEffect(() => {
+    blocks.forEach((block) => {
+      if (block.block_type !== 'image') return;
+      const content = block.content as { url?: string };
+      if (!content?.url) return;
+
+      const prevUrl = lastImageUrlByLayoutRef.current[block.layout.i];
+      if (prevUrl && prevUrl !== content.url) {
+        // Reset ratio normalization when image changes
+        normalizedImageLayoutsRef.current.delete(block.layout.i);
+      }
+      lastImageUrlByLayoutRef.current[block.layout.i] = content.url;
+    });
+  }, [blocks]);
 
   // Auto-save function
   const performSave = useCallback(async () => {
@@ -483,6 +499,8 @@ export function PageEditor({
             : b
         )
       );
+      normalizedImageLayoutsRef.current.delete(block.layout.i);
+      lastImageUrlByLayoutRef.current[block.layout.i] = data.url;
     } catch (error) {
       console.error('Upload failed:', error);
     }
@@ -499,7 +517,18 @@ export function PageEditor({
 
   const handleSaveBlock = useCallback((updatedBlock: ContentBlock) => {
     setBlocks((prev) =>
-      prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b))
+      prev.map((b) => {
+        if (b.id !== updatedBlock.id) return b;
+        if (updatedBlock.block_type === 'image') {
+          const prevUrl = (b.content as { url?: string })?.url;
+          const nextUrl = (updatedBlock.content as { url?: string })?.url;
+          if (prevUrl && nextUrl && prevUrl !== nextUrl) {
+            normalizedImageLayoutsRef.current.delete(updatedBlock.layout.i);
+            lastImageUrlByLayoutRef.current[updatedBlock.layout.i] = nextUrl;
+          }
+        }
+        return updatedBlock;
+      })
     );
   }, []);
 
