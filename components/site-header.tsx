@@ -80,7 +80,7 @@ export function SiteHeader() {
                     {projects.map((project) => (
                       <Link
                         key={project.id}
-                        href={`/projects/${project.slug}`}
+                        href={`/${project.slug}`}
                         className="block px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5"
                       >
                         {project.title}

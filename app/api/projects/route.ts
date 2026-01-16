@@ -9,6 +9,7 @@ export async function GET() {
     .select('*')
     .eq('page_type', 'project')
     .order('created_at', { ascending: false });
+  let usingPageType = true;
 
   if (pagesError && /page_type/i.test(pagesError.message)) {
     const fallback = await supabase
@@ -17,6 +18,7 @@ export async function GET() {
       .order('created_at', { ascending: false });
     pages = fallback.data || [];
     pagesError = fallback.error;
+    usingPageType = false;
   }
 
   if (pagesError) {
@@ -27,7 +29,9 @@ export async function GET() {
     return NextResponse.json({ projects: [] });
   }
 
-  const filteredPages = pages.filter((page) => page.page_type === 'project' || page.slug?.startsWith('project-'));
+  const filteredPages = usingPageType
+    ? pages.filter((page) => page.page_type === 'project')
+    : pages.filter((page) => !['home', 'about', 'projects'].includes(page.slug));
 
   const pageIds = filteredPages.map((page) => page.id);
   const { data: blocks, error: blocksError } = await supabase
