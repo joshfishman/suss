@@ -64,7 +64,7 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
       <iframe
         ref={iframeRef}
         src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0`}
-        className="absolute block border-0 bg-black"
+        className="absolute block border-0 bg-black z-0"
         style={{
           top: -1,
           left: -1,
@@ -78,7 +78,7 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
         <button
           type="button"
           onClick={handleTogglePlay}
-          className="absolute inset-0 flex items-center justify-center bg-black/30 text-white transition-opacity"
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 text-white transition-opacity"
         >
           {isPlaying ? <Pause className="w-10 h-10" /> : <Play className="w-10 h-10" />}
         </button>
