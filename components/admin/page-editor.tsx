@@ -519,7 +519,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
 
   return (
-    <div className="min-h-screen bg-black text-white" {...getRootProps()}>
+    <div className="min-h-screen bg-black text-white flex flex-col" {...getRootProps()}>
       <input {...getInputProps()} />
       
       {/* Drag overlay */}
@@ -604,7 +604,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       {/* Site header - matches public layout */}
       <SiteHeader />
 
-      <main className="pt-20">
+      <main className="pt-20 flex-1">
         {/* Page hero - editable (matches public styling) */}
         <section className="py-20 px-8">
           <div className="container mx-auto max-w-4xl">

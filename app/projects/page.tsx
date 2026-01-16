@@ -37,14 +37,14 @@ async function PageContent() {
 
 export default function ProjectsPage() {
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <SiteHeader />
-      <main className="pt-20">
+      <main className="pt-20 flex-1">
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
           <PageContent />
         </Suspense>
       </main>
       <SiteFooter />
-    </>
+    </div>
   );
 }
