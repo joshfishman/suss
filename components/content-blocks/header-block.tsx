@@ -8,11 +8,11 @@ interface HeaderBlockProps {
 
 export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBlockProps) {
   return (
-    <div className="relative w-full h-full flex flex-col justify-center p-6">
+    <div className="relative w-full h-full flex flex-col justify-center p-6 bg-black text-white">
       <h3
         contentEditable={isEditing}
         suppressContentEditableWarning
-        onBlur={(e) => {
+        onInput={(e) => {
           if (!onChange) return;
           onChange({
             ...content,
@@ -28,7 +28,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
         <p
           contentEditable={isEditing}
           suppressContentEditableWarning
-          onBlur={(e) => {
+          onInput={(e) => {
             if (!onChange) return;
             onChange({
               ...content,
@@ -44,7 +44,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
         <p
           contentEditable
           suppressContentEditableWarning
-          onBlur={(e) => {
+          onInput={(e) => {
             if (!onChange) return;
             onChange({
               ...content,
