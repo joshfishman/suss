@@ -362,33 +362,34 @@ export function PageEditor({
 
   const handleResize = useCallback((
     layout: Layout,
-    oldItem: LayoutItem,
-    newItem: LayoutItem,
-    placeholder: LayoutItem
+    oldItem: LayoutItem | null,
+    newItem: LayoutItem | null,
+    placeholder: LayoutItem | null
   ) => {
+    if (!newItem) return;
     const block = blocks.find((b) => b.layout.i === newItem.i);
     if (!block) return;
     const ratio = getRatioForBlock(block);
     if (!ratio) return;
 
-    const widthChanged = newItem.w !== oldItem.w;
-    const heightChanged = newItem.h !== oldItem.h;
+    const widthChanged = !oldItem || newItem.w !== oldItem.w;
+    const heightChanged = !oldItem || newItem.h !== oldItem.h;
 
     if (widthChanged) {
       const newHeight = Math.max(1, Math.round(newItem.w / ratio));
       newItem.h = newHeight;
-      placeholder.h = newHeight;
+      if (placeholder) placeholder.h = newHeight;
     } else if (heightChanged) {
       const newWidth = Math.max(1, Math.round(newItem.h * ratio));
       newItem.w = newWidth;
-      placeholder.w = newWidth;
+      if (placeholder) placeholder.w = newWidth;
     }
   }, [blocks, getRatioForBlock]);
 
   const handleResizeStop = useCallback((
     layout: Layout,
-    oldItem: LayoutItem,
-    newItem: LayoutItem
+    oldItem: LayoutItem | null,
+    newItem: LayoutItem | null
   ) => {
     // Keep ratios locked; no updates needed here
   }, []);
