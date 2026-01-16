@@ -435,12 +435,23 @@ export function PageEditor({
       let candidate = { ...next };
       let safety = 0;
       while (isOverlappingWithRatios(currentId, candidate) && safety < 200) {
-        candidate = { ...candidate, y: candidate.y + GRID_GAP };
+        let maxBottom = candidate.y;
+        for (const block of blocks) {
+          if (block.id === currentId) continue;
+          const otherH = getBlockHeightPx(block);
+          const overlapX =
+            candidate.x < block.layout.x + block.layout.w &&
+            candidate.x + candidate.w > block.layout.x;
+          if (!overlapX) continue;
+          const bottom = block.layout.y + otherH + GRID_GAP;
+          if (bottom > maxBottom) maxBottom = bottom;
+        }
+        candidate = { ...candidate, y: maxBottom };
         safety += 1;
       }
       return candidate;
     },
-    [isOverlappingWithRatios]
+    [blocks, getBlockHeightPx, isOverlappingWithRatios]
   );
 
   const resolveAllOverlaps = useCallback(
@@ -456,22 +467,31 @@ export function PageEditor({
       for (const block of sorted) {
         let candidate = { ...block, layout: { ...block.layout } };
         let safety = 0;
-        const overlapsAny = (item: ContentBlock) => {
+        const nextYAfterOverlap = (item: ContentBlock) => {
           const itemH = getBlockHeightPx(item);
-          return placed.some((other) => {
+          let maxBottom = item.layout.y;
+          let hasOverlap = false;
+          for (const other of placed) {
             const otherH = getBlockHeightPx(other);
             const overlapX =
               item.layout.x < other.layout.x + other.layout.w &&
               item.layout.x + item.layout.w > other.layout.x;
+            if (!overlapX) continue;
             const overlapY =
               item.layout.y < other.layout.y + otherH + GRID_GAP &&
               item.layout.y + itemH + GRID_GAP > other.layout.y;
-            return overlapX && overlapY;
-          });
+            if (!overlapY) continue;
+            hasOverlap = true;
+            const bottom = other.layout.y + otherH + GRID_GAP;
+            if (bottom > maxBottom) maxBottom = bottom;
+          }
+          return hasOverlap ? maxBottom : null;
         };
 
-        while (overlapsAny(candidate) && safety < 200) {
-          candidate = { ...candidate, layout: { ...candidate.layout, y: candidate.layout.y + GRID_GAP } };
+        while (safety < 200) {
+          const nextY = nextYAfterOverlap(candidate);
+          if (nextY === null) break;
+          candidate = { ...candidate, layout: { ...candidate.layout, y: nextY } };
           safety += 1;
         }
 
