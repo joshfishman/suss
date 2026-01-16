@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
+  const url = new URL(request.url);
+  const draftMode = url.searchParams.get('draft') === '1';
   
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser();
@@ -14,9 +16,9 @@ export async function POST(request: Request) {
   const { page_id, block_type, content, layout, sort_order } = body;
 
   const { data, error } = await supabase
-    .from('content_blocks')
+    .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
     .insert({
-      page_id,
+      ...(draftMode ? { page_draft_id: page_id } : { page_id }),
       block_type,
       content,
       layout,

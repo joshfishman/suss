@@ -7,6 +7,8 @@ export async function PUT(
 ) {
   const { id } = await params;
   const supabase = await createClient();
+  const url = new URL(request.url);
+  const draftMode = url.searchParams.get('draft') === '1';
   
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser();
@@ -18,7 +20,7 @@ export async function PUT(
   const { content, layout, sort_order } = body;
 
   const { data, error } = await supabase
-    .from('content_blocks')
+    .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
     .update({ content, layout, sort_order })
     .eq('id', id)
     .select()
@@ -37,6 +39,8 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const supabase = await createClient();
+  const url = new URL(request.url);
+  const draftMode = url.searchParams.get('draft') === '1';
   
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser();
@@ -45,7 +49,7 @@ export async function DELETE(
   }
 
   const { error } = await supabase
-    .from('content_blocks')
+    .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
     .delete()
     .eq('id', id);
 

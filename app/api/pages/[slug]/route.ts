@@ -7,9 +7,11 @@ export async function GET(
 ) {
   const { slug } = await params;
   const supabase = await createClient();
+  const url = new URL(request.url);
+  const draftMode = url.searchParams.get('draft') === '1';
   
   const { data: page, error: pageError } = await supabase
-    .from('pages')
+    .from(draftMode ? 'pages_drafts' : 'pages')
     .select('*')
     .eq('slug', slug)
     .single();
@@ -19,9 +21,9 @@ export async function GET(
   }
 
   const { data: blocks, error: blocksError } = await supabase
-    .from('content_blocks')
+    .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
     .select('*')
-    .eq('page_id', page.id)
+    .eq(draftMode ? 'page_draft_id' : 'page_id', page.id)
     .order('sort_order', { ascending: true });
 
   if (blocksError) {
@@ -37,6 +39,8 @@ export async function PUT(
 ) {
   const { slug } = await params;
   const supabase = await createClient();
+  const url = new URL(request.url);
+  const draftMode = url.searchParams.get('draft') === '1';
   
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser();
@@ -45,12 +49,19 @@ export async function PUT(
   }
 
   const body = await request.json();
-  const { title, description } = body;
+  const { title, description, published_page_id } = body;
 
   const { data, error } = await supabase
-    .from('pages')
-    .update({ title, description })
-    .eq('slug', slug)
+    .from(draftMode ? 'pages_drafts' : 'pages')
+    .upsert(
+      {
+        slug,
+        title,
+        description,
+        ...(draftMode ? { published_page_id: published_page_id || null } : {}),
+      },
+      { onConflict: 'slug' }
+    )
     .select()
     .single();
 

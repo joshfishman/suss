@@ -1,28 +1,39 @@
 import { Suspense } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 import { PageViewer } from '@/components/page-viewer';
-import { SiteHeader } from '@/components/site-header';
-import { SiteFooter } from '@/components/site-footer';
 import { PageHero } from '@/components/page-hero';
+import { PageShell } from '@/components/page-shell';
+import { PageEditor } from '@/components/admin/page-editor';
+import { getPageData } from '@/lib/drafts';
 
-async function PageContent() {
+async function PageContent({ editMode }: { editMode: boolean }) {
   const supabase = await createClient();
 
-  const { data: page } = await supabase
-    .from('pages')
-    .select('*')
-    .eq('slug', 'about')
-    .single();
+  if (editMode) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      redirect('/auth/login');
+    }
+  }
+
+  const { page, blocks } = await getPageData('about', editMode);
 
   if (!page) {
     return <div>Page not found</div>;
   }
 
-  const { data: blocks } = await supabase
-    .from('content_blocks')
-    .select('*')
-    .eq('page_id', page.id)
-    .order('sort_order', { ascending: true });
+  if (editMode) {
+    return (
+      <PageEditor
+        page={page}
+        initialBlocks={blocks || []}
+        draftMode
+        editOnPublic
+        exitHref="/about"
+      />
+    );
+  }
 
   return (
     <>
@@ -35,16 +46,22 @@ async function PageContent() {
   );
 }
 
-export default function AboutPage() {
+export default function AboutPage({ searchParams }: { searchParams?: { edit?: string } }) {
+  const editMode = searchParams?.edit === '1';
+
+  if (editMode) {
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+        <PageContent editMode />
+      </Suspense>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <SiteHeader />
-      <main className="flex-1">
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-          <PageContent />
-        </Suspense>
-      </main>
-      <SiteFooter />
-    </div>
+    <PageShell>
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+        <PageContent editMode={false} />
+      </Suspense>
+    </PageShell>
   );
 }

@@ -83,11 +83,20 @@ function normalizeInitialBlocks(blocks: ContentBlock[]) {
 }
 
 interface PageEditorProps {
-  page: Page;
+  page: Page & { published_page_id?: string | null };
   initialBlocks: ContentBlock[];
+  draftMode?: boolean;
+  editOnPublic?: boolean;
+  exitHref?: string;
 }
 
-export function PageEditor({ page, initialBlocks }: PageEditorProps) {
+export function PageEditor({
+  page,
+  initialBlocks,
+  draftMode = false,
+  editOnPublic = false,
+  exitHref,
+}: PageEditorProps) {
   const router = useRouter();
   const [blocks, setBlocks] = useState<ContentBlock[]>(() => normalizeInitialBlocks(initialBlocks));
   const [title, setTitle] = useState(page.title);
@@ -186,22 +195,27 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
   // Auto-save function
   const performSave = useCallback(async () => {
+    const draftQuery = draftMode ? '?draft=1' : '';
     setSaveStatus('saving');
     setIsSaving(true);
     isSavingSyncRef.current = true;
     
     try {
       // Save page settings
-      await fetch(`/api/pages/${page.slug}`, {
+      await fetch(`/api/pages/${page.slug}${draftQuery}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description }),
+        body: JSON.stringify({
+          title,
+          description,
+          published_page_id: page.published_page_id || null,
+        }),
       });
 
       // Delete blocks that were removed
       for (const block of lastSavedRef.current.blocks) {
         if (!block.id.startsWith('temp-') && !blocks.find(b => b.id === block.id)) {
-          await fetch(`/api/content-blocks/${block.id}`, {
+          await fetch(`/api/content-blocks/${block.id}${draftQuery}`, {
             method: 'DELETE',
           });
         }
@@ -213,7 +227,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         const block = blocks[i];
 
         if (block.id.startsWith('temp-')) {
-          const response = await fetch('/api/content-blocks', {
+          const response = await fetch(`/api/content-blocks${draftQuery}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -232,7 +246,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             updatedBlocks.push(block);
           }
         } else {
-          await fetch(`/api/content-blocks/${block.id}`, {
+          await fetch(`/api/content-blocks/${block.id}${draftQuery}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -264,7 +278,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         isSavingSyncRef.current = false;
       }, 0);
     }
-  }, [title, description, blocks, page.slug, page.id]);
+  }, [title, description, blocks, page.slug, page.id, draftMode, page.published_page_id]);
 
   // Trigger auto-save on changes
   useEffect(() => {
@@ -417,7 +431,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
   const handleClearBlocks = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/clear-content-blocks', {
+      const response = await fetch(`/api/admin/clear-content-blocks${draftMode ? '?draft=1' : ''}`, {
         method: 'POST',
       });
 
@@ -432,7 +446,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     } catch (error) {
       console.error('Failed to clear blocks:', error);
     }
-  }, [title, description]);
+  }, [title, description, draftMode]);
 
   const handleEditBlock = useCallback((block: ContentBlock) => {
     setEditingBlock(block);
@@ -443,6 +457,32 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
       prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b))
     );
   }, []);
+
+  const handlePublish = useCallback(async () => {
+    if (!draftMode) return;
+    try {
+      const response = await fetch('/api/admin/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: page.slug }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to publish');
+        return;
+      }
+
+      if (editOnPublic && exitHref) {
+        router.push(exitHref);
+        router.refresh();
+        return;
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error('Failed to publish:', error);
+    }
+  }, [draftMode, page.slug, editOnPublic, exitHref, router]);
 
   // Handle file drop for images
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -537,10 +577,10 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/admin">
+              <Link href={editOnPublic ? (exitHref || `/${page.slug}`) : "/admin"}>
                 <Button variant="ghost" size="sm" className="text-white hover:bg-gray-800">
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
+                  {editOnPublic ? 'Exit' : 'Back'}
                 </Button>
               </Link>
               <span className="text-sm text-gray-400">Editing: {page.title}</span>
@@ -565,6 +605,16 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
                 <Video className="w-4 h-4 mr-2" />
                 Vimeo
               </Button>
+              {draftMode && (
+                <Button
+                  onClick={handlePublish}
+                  variant="outline"
+                  size="sm"
+                  className="border-green-600 text-green-300 hover:bg-green-900/30"
+                >
+                  Publish
+                </Button>
+              )}
               <Button
                 onClick={handleClearBlocks}
                 variant="outline"

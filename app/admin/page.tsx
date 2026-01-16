@@ -36,7 +36,7 @@ async function DashboardContent() {
                   <Link href={`/${page.slug}`} target="_blank">
                     <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-700">View</Button>
                   </Link>
-                  <Link href={`/admin/${page.slug}`}>
+                  <Link href={`/${page.slug}?edit=1`}>
                     <Button className="bg-white text-black hover:bg-gray-200">Edit</Button>
                   </Link>
                 </div>
