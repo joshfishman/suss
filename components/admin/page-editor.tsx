@@ -45,7 +45,7 @@ function sizesChanged(
 }
 
 const GRID_COLS = 4;
-const GRID_GAP = 16;
+const GRID_GAP = 32; // 2rem gap
 const GRID_ROW = 320; // 20rem row snap
 
 function colWidth(containerWidth: number) {
@@ -69,11 +69,11 @@ function pxToGridW(px: number, containerWidth: number) {
 }
 
 function gridToPxY(y: number) {
-  return y * GRID_ROW;
+  return y * (GRID_ROW + GRID_GAP);
 }
 
 function pxToGridY(px: number) {
-  return Math.max(0, Math.round(px / GRID_ROW));
+  return Math.max(0, Math.round(px / (GRID_ROW + GRID_GAP)));
 }
 
 function ratioToGridH(w: number, ratio: number, containerWidth: number) {
@@ -867,8 +867,8 @@ export function PageEditor({
                   size={{ width: widthPx, height: heightPx }}
                   position={{ x: xPx, y: yPx }}
                   lockAspectRatio={ratio ?? false}
-                  dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW]}
-                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW]}
+                  dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW + GRID_GAP]}
+                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW + GRID_GAP]}
                   minWidth={gridToPxW(1, containerWidth)}
                   maxWidth={gridToPxW(4, containerWidth)}
                   enableResizing={showEditControls}
