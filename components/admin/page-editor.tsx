@@ -119,6 +119,9 @@ export function PageEditor({
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(page.layout_mode || 'snap');
+  const [projectPreviews, setProjectPreviews] = useState<
+    { id: string; slug: string; title: string; first_block: ContentBlock | null }[]
+  >([]);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [showEditControls, setShowEditControls] = useState(!readOnly);
   const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
@@ -174,6 +177,26 @@ export function PageEditor({
       window.removeEventListener('resize', updateWidth);
     };
   }, []);
+
+  useEffect(() => {
+    if (page.slug !== 'home') return;
+    let cancelled = false;
+    const loadProjects = async () => {
+      try {
+        const response = await fetch('/api/projects');
+        const data = await response.json();
+        if (!cancelled && response.ok) {
+          setProjectPreviews(data.projects || []);
+        }
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+      }
+    };
+    loadProjects();
+    return () => {
+      cancelled = true;
+    };
+  }, [page.slug]);
 
   const imageItems = useMemo<ImageItem[]>(() => {
     return blocks
@@ -869,6 +892,30 @@ export function PageEditor({
     }
   }, [draftMode, page.slug, editOnPublic, exitHref, router]);
 
+  const handleCreateProject = useCallback(async () => {
+    const title = window.prompt('Project title');
+    if (!title) return;
+    const slug = title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    try {
+      const response = await fetch('/api/admin/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, slug }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create project');
+      }
+      router.push(`/projects/${data.slug}?edit=1`);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    }
+  }, [router]);
+
   // Handle file drop for images
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setIsDraggingFile(false);
@@ -999,6 +1046,14 @@ export function PageEditor({
               >
                 <Video className="w-4 h-4 mr-2" />
                 Vimeo
+              </Button>
+              <Button
+                onClick={handleCreateProject}
+                variant="outline"
+                size="sm"
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                New Project
               </Button>
               {draftMode && (
                 <Button
@@ -1349,6 +1404,34 @@ export function PageEditor({
           </div>
         )}
         </div>
+
+        {page.slug === 'home' && (
+          <section className="container mx-auto px-8 pb-24">
+            <div className="mb-6">
+              <h2 className="text-2xl md:text-3xl font-light tracking-tight">Projects</h2>
+            </div>
+            {projectPreviews.length === 0 ? (
+              <p className="text-white/60 text-sm">No projects yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {projectPreviews.map((project) => (
+                  <Link key={project.id} href={`/projects/${project.slug}`} className="group">
+                    <div className="mb-3 text-lg font-light">{project.title}</div>
+                    {project.first_block ? (
+                      <div className="rounded-lg overflow-hidden bg-black">
+                        <BlockRenderer block={project.first_block} />
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-white/5 text-white/60 text-sm p-6">
+                        No preview yet
+                      </div>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       {/* Site footer - same as front end */}

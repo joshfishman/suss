@@ -1,5 +1,6 @@
 export type BlockType = 'image' | 'vimeo' | 'text';
 export type LayoutMode = 'snap' | 'free';
+export type PageType = 'page' | 'project';
 
 export interface ContentBlock {
   id: string;
@@ -41,6 +42,7 @@ export interface Page {
   title: string;
   description?: string;
   layout_mode?: LayoutMode;
+  page_type?: PageType;
   created_at: string;
   updated_at: string;
 }

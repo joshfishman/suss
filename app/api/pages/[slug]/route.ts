@@ -49,13 +49,14 @@ export async function PUT(
   }
 
   const body = await request.json();
-  const { title, description, published_page_id, layout_mode } = body;
+  const { title, description, published_page_id, layout_mode, page_type } = body;
 
   const upsertPayload = {
     slug,
     title,
     description,
     layout_mode: layout_mode || 'snap',
+    page_type: page_type || 'page',
     ...(draftMode ? { published_page_id: published_page_id || null } : {}),
   };
 
@@ -65,8 +66,8 @@ export async function PUT(
     .select()
     .single();
 
-  if (error && /layout_mode/i.test(error.message)) {
-    const { layout_mode: _layoutMode, ...fallbackPayload } = upsertPayload;
+  if (error && /(layout_mode|page_type)/i.test(error.message)) {
+    const { layout_mode: _layoutMode, page_type: _pageType, ...fallbackPayload } = upsertPayload;
     const fallback = await supabase
       .from(draftMode ? 'pages_drafts' : 'pages')
       .upsert(fallbackPayload, { onConflict: 'slug' })

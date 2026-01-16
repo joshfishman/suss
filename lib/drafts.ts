@@ -33,6 +33,7 @@ async function ensureDrafts(slug: string) {
         description: livePage.description,
         layout_mode: livePage.layout_mode || 'snap',
         published_page_id: livePage.id,
+        page_type: livePage.page_type || 'page',
       })
       .select()
       .single();
