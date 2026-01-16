@@ -2,7 +2,6 @@ import { Suspense } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { PageEditor } from '@/components/admin/page-editor';
-import { PageEditor } from '@/components/admin/page-editor';
 import { getPageData } from '@/lib/drafts';
 
 async function PageContent({ editMode }: { editMode: boolean }) {
