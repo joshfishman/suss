@@ -1041,7 +1041,11 @@ export function PageEditor({
 
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col" {...(readOnly ? {} : getRootProps())}>
+    <div
+      dir="ltr"
+      className="min-h-screen bg-black text-white flex flex-col"
+      {...(readOnly ? {} : getRootProps())}
+    >
       {!readOnly && <input {...getInputProps()} />}
       {!readOnly && (
         <input

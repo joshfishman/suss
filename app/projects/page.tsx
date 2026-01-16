@@ -61,7 +61,7 @@ export default async function ProjectsPage() {
 
   return (
     <PageShell>
-      <section className="container mx-auto px-8 pb-24">
+      <section className="container mx-auto px-8 pb-24" dir="ltr">
         <div className="mb-10">
           <h1 className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 text-white">
             Projects
