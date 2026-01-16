@@ -238,21 +238,6 @@ export function PageEditor({
     });
   }, [blocks]);
 
-  useEffect(() => {
-    setBlocks((prev) => {
-      let changed = false;
-      const next = prev.map((block) => {
-        if (block.block_type !== 'vimeo') return block;
-        const nextH = ratioToPxH(block.layout.w, 16 / 9, containerWidth);
-        if (block.layout.h === nextH) return block;
-        changed = true;
-        return { ...block, layout: { ...block.layout, h: nextH } };
-      });
-      if (!changed) return prev;
-      return resolveAllOverlaps(next);
-    });
-  }, [containerWidth, resolveAllOverlaps]);
-
   // Auto-save function
   const performSave = useCallback(async () => {
     const draftQuery = draftMode ? '?draft=1' : '';
@@ -503,6 +488,21 @@ export function PageEditor({
     },
     [getBlockHeightPx]
   );
+
+  useEffect(() => {
+    setBlocks((prev) => {
+      let changed = false;
+      const next = prev.map((block) => {
+        if (block.block_type !== 'vimeo') return block;
+        const nextH = ratioToPxH(block.layout.w, 16 / 9, containerWidth);
+        if (block.layout.h === nextH) return block;
+        changed = true;
+        return { ...block, layout: { ...block.layout, h: nextH } };
+      });
+      if (!changed) return prev;
+      return resolveAllOverlaps(next);
+    });
+  }, [containerWidth, resolveAllOverlaps]);
 
   useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
