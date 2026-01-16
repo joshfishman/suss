@@ -1004,7 +1004,7 @@ export function PageEditor({
                       }
                     }}
                   >
-                    <BlockRenderer block={block} isEditing />
+                    <BlockRenderer block={block} isEditing={!readOnly && showEditControls} />
                     {!readOnly && showEditControls && (
                       <>
                         {block.block_type === 'vimeo' ? (
