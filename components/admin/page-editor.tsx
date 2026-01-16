@@ -1023,11 +1023,12 @@ export function PageEditor({
                       return resolveAllOverlaps(next);
                     });
                   }}
-                  onResizeStop={(_, __, ___, delta, position) => {
-                    const nextW = pxToGridW(widthPx + delta.width, containerWidth);
+                  onResizeStop={(_, __, ref, __, position) => {
+                    const nextWidthPx = ref.offsetWidth;
+                    const nextW = pxToGridW(nextWidthPx, containerWidth);
                     const nextH = ratio
                       ? ratioToPxH(nextW, ratio, containerWidth)
-                      : Math.max(80, heightPx + delta.height);
+                      : Math.max(80, ref.offsetHeight);
                     const nextXRaw = pxToGridX(position.x, containerWidth);
                     const nextX = clampGridX(nextXRaw, nextW);
                     const nextY = Math.max(0, position.y);
