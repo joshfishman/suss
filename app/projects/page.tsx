@@ -46,8 +46,16 @@ async function PageContent({ editMode }: { editMode: boolean }) {
   );
 }
 
-export default function ProjectsPage({ searchParams }: { searchParams?: { edit?: string } }) {
-  const editMode = searchParams?.edit === '1';
+function isEditMode(searchParams?: { edit?: string | string[] }) {
+  const editParam = searchParams?.edit;
+  if (Array.isArray(editParam)) {
+    return editParam.includes('1') || editParam.includes('true');
+  }
+  return editParam === '1' || editParam === 'true';
+}
+
+export default function ProjectsPage({ searchParams }: { searchParams?: { edit?: string | string[] } }) {
+  const editMode = isEditMode(searchParams);
 
   if (editMode) {
     return (
