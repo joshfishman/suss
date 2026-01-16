@@ -965,7 +965,7 @@ export function PageEditor({
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create project');
       }
-      router.push(`/projects/${data.slug}?edit=1`);
+      router.push(`/${data.slug}?edit=1`);
     } catch (error) {
       console.error('Failed to create project:', error);
     }
@@ -1560,7 +1560,7 @@ export function PageEditor({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {projectPreviews.map((project) => (
-                  <Link key={project.id} href={`/projects/${project.slug}`} className="group">
+                  <Link key={project.id} href={`/${project.slug}`} className="group">
                     <div className="mb-3 text-lg font-light">{project.title}</div>
                     {project.first_block ? (
                       <div className="rounded-lg overflow-hidden bg-black">

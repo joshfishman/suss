@@ -75,7 +75,7 @@ export default async function ProjectsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {projects.map((project) => (
-              <Link key={project.id} href={`/projects/${project.slug}`} className="group">
+              <Link key={project.id} href={`/${project.slug}`} className="group">
                 <div className="mb-3 text-lg font-light text-white">{project.title}</div>
                 {project.first_block ? (
                   <div className="rounded-lg overflow-hidden bg-black">
