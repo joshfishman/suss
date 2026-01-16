@@ -54,9 +54,14 @@ function isEditMode(searchParams?: { edit?: string | string[] }) {
   return editParam === '1' || editParam === 'true';
 }
 
-export default function HomePage({ searchParams }: { searchParams?: { edit?: string | string[] } }) {
-  const editMode = isEditMode(searchParams);
-  const editRaw = searchParams?.edit;
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ edit?: string | string[] }>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const editMode = isEditMode(resolvedSearchParams);
+  const editRaw = resolvedSearchParams?.edit;
   const editRawText = Array.isArray(editRaw) ? editRaw.join(',') : editRaw;
 
   if (editMode) {
