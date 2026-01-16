@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Player from '@vimeo/player';
 import { VimeoContent } from '@/lib/types/content';
 import { Play, Pause, Video } from 'lucide-react';
@@ -16,25 +16,36 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
   const [isHovering, setIsHovering] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  useEffect(() => {
-    if (!iframeRef.current || !content.vimeo_id) return;
-    playerRef.current = new Player(iframeRef.current);
-    playerRef.current.on('play', () => setIsPlaying(true));
-    playerRef.current.on('pause', () => setIsPlaying(false));
-    playerRef.current.on('ended', () => setIsPlaying(false));
-
-    return () => {
-      playerRef.current?.destroy();
-      playerRef.current = null;
-    };
+  const ensurePlayer = useCallback(() => {
+    if (!iframeRef.current || !content.vimeo_id) return null;
+    if (!playerRef.current) {
+      playerRef.current = new Player(iframeRef.current);
+      playerRef.current.on('play', () => setIsPlaying(true));
+      playerRef.current.on('pause', () => setIsPlaying(false));
+      playerRef.current.on('ended', () => setIsPlaying(false));
+    }
+    return playerRef.current;
   }, [content.vimeo_id]);
 
+  useEffect(() => {
+    const player = ensurePlayer();
+    return () => {
+      player?.destroy();
+      playerRef.current = null;
+    };
+  }, [ensurePlayer]);
+
   const handleTogglePlay = async () => {
-    if (!playerRef.current) return;
-    if (isPlaying) {
-      await playerRef.current.pause();
-    } else {
-      await playerRef.current.play();
+    const player = ensurePlayer();
+    if (!player) return;
+    try {
+      if (isPlaying) {
+        await player.pause();
+      } else {
+        await player.play();
+      }
+    } catch (error) {
+      console.error('Vimeo playback failed:', error);
     }
   };
 
