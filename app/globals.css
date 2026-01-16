@@ -163,3 +163,10 @@
   color: #9ca3af;
   pointer-events: none;
 }
+
+/* Ensure LTR typing for contenteditable fields */
+[contenteditable] {
+  direction: ltr;
+  unicode-bidi: plaintext;
+  text-align: left;
+}
