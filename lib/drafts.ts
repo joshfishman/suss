@@ -25,19 +25,33 @@ async function ensureDrafts(slug: string) {
     .single();
 
   if (!draftPage) {
-    const { data: createdDraft, error: createdDraftError } = await supabase
+    const insertPayload = {
+      slug: livePage.slug,
+      title: livePage.title,
+      description: livePage.description,
+      hero_title: livePage.hero_title || livePage.title,
+      layout_mode: livePage.layout_mode || 'snap',
+      published_page_id: livePage.id,
+      page_type: livePage.page_type || 'page',
+    };
+
+    let { data: createdDraft, error: createdDraftError } = await supabase
       .from('pages_drafts')
-      .insert({
-        slug: livePage.slug,
-        title: livePage.title,
-        description: livePage.description,
-        hero_title: livePage.hero_title || livePage.title,
-        layout_mode: livePage.layout_mode || 'snap',
-        published_page_id: livePage.id,
-        page_type: livePage.page_type || 'page',
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    if (createdDraftError && /(hero_title|layout_mode|page_type)/i.test(createdDraftError.message)) {
+      const { hero_title: _heroTitle, layout_mode: _layoutMode, page_type: _pageType, ...fallbackPayload } =
+        insertPayload;
+      const fallback = await supabase
+        .from('pages_drafts')
+        .insert(fallbackPayload)
+        .select()
+        .single();
+      createdDraft = fallback.data;
+      createdDraftError = fallback.error;
+    }
 
     if (createdDraftError || !createdDraft) {
       return { page: null, blocks: [] as ContentBlock[] };
