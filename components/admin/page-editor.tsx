@@ -811,7 +811,7 @@ export function PageEditor({
       <main className={`${readOnly ? 'pt-20' : 'pt-32'} flex-1`}>
         {/* Page hero - editable (matches public styling) */}
         <section className="py-20 px-8">
-          <div className="container mx-auto max-w-4xl">
+          <div className="container mx-auto px-8">
             <h1
               ref={titleRef}
               contentEditable
