@@ -38,8 +38,10 @@ export function AdminEditToggle() {
       type="button"
       onClick={() => {
         startTransition(() => {
-          router.push(toggleHref);
-          router.refresh();
+          router.replace(toggleHref);
+          setTimeout(() => {
+            router.refresh();
+          }, 50);
         });
       }}
       disabled={isPending}
