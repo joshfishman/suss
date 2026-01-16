@@ -62,8 +62,13 @@ export default async function ProjectsPage() {
   return (
     <PageShell>
       <section className="container mx-auto px-8 pb-24">
-        <div className="mb-6">
-          <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white">Projects</h2>
+        <div className="mb-10">
+          <h1 className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 text-white">
+            Projects
+          </h1>
+          <p className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl">
+            A curated selection of our latest work.
+          </p>
         </div>
         {projects.length === 0 ? (
           <p className="text-white/60 text-sm">No projects yet.</p>
