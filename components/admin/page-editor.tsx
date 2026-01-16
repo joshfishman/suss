@@ -345,6 +345,27 @@ export function PageEditor({
               sort_order: i,
             }),
           });
+
+          if (response.status === 404) {
+            // Block missing (out-of-sync). Recreate it.
+            const recreateResponse = await fetch(`/api/content-blocks${draftQuery}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                page_id: page.id,
+                block_type: block.block_type,
+                content: block.content,
+                layout: block.layout,
+                sort_order: i,
+              }),
+            });
+            if (recreateResponse.ok) {
+              const data = await recreateResponse.json();
+              updatedBlocks.push({ ...block, id: data.id });
+              continue;
+            }
+          }
+
           if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to update block ${block.id}: ${errorText}`);
