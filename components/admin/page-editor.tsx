@@ -434,6 +434,44 @@ export function PageEditor({
     return null;
   }, [measuredSizes]);
 
+  const getBlockGridH = useCallback(
+    (block: ContentBlock, widthOverride?: number) => {
+      const ratio = getRatioForBlock(block);
+      const effectiveW = widthOverride ?? block.layout.w;
+      if (ratio) {
+        return ratioToGridH(effectiveW, ratio, containerWidth);
+      }
+      return block.layout.h;
+    },
+    [getRatioForBlock, containerWidth]
+  );
+
+  const isOverlappingWithRatios = useCallback(
+    (currentId: string, next: { x: number; y: number; w: number; h: number }) =>
+      blocks.some((block) => {
+        if (block.id === currentId) return false;
+        const otherH = getBlockGridH(block);
+        const other = { ...block.layout, h: otherH };
+        const overlapX = next.x < other.x + other.w && next.x + next.w > other.x;
+        const overlapY = next.y < other.y + other.h && next.y + next.h > other.y;
+        return overlapX && overlapY;
+      }),
+    [blocks, getBlockGridH]
+  );
+
+  const resolveOverlap = useCallback(
+    (currentId: string, next: { x: number; y: number; w: number; h: number }) => {
+      let candidate = { ...next };
+      let safety = 0;
+      while (isOverlappingWithRatios(currentId, candidate) && safety < 200) {
+        candidate = { ...candidate, y: candidate.y + 1 };
+        safety += 1;
+      }
+      return candidate;
+    },
+    [isOverlappingWithRatios]
+  );
+
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     // Find first row (y=0) and calculate used width there
     const firstRowBlocks = blocks.filter(b => b.layout.y === 0);
@@ -441,7 +479,10 @@ export function PageEditor({
     
     // If there's space in the first row, add there; otherwise start a new row
     const nextX = usedWidth < 4 ? usedWidth : 0;
-    const nextY = usedWidth < 4 ? 0 : (blocks.length > 0 ? Math.max(...blocks.map(b => b.layout.y + 1)) : 0);
+    const maxBottomY = blocks.length
+      ? Math.max(...blocks.map((b) => b.layout.y + getBlockGridH(b)))
+      : 0;
+    const nextY = usedWidth < 4 ? 0 : maxBottomY;
 
     const blockId = createBlockId('block');
     
@@ -858,7 +899,19 @@ export function PageEditor({
             </div>
           </div>
         ) : (
-          <div className="relative w-full min-h-[400px]">
+          <div
+            className="relative w-full min-h-[400px]"
+            style={{
+              minHeight: Math.max(
+                400,
+                gridToPxY(
+                  blocks.length
+                    ? Math.max(...blocks.map((b) => b.layout.y + getBlockGridH(b)))
+                    : 1
+                ) - GRID_GAP
+              ),
+            }}
+          >
             {blocks.map((block) => {
               const ratio = getRatioForBlock(block);
               const widthPx = gridToPxW(block.layout.w, containerWidth);
@@ -883,16 +936,14 @@ export function PageEditor({
                     const nextXRaw = pxToGridX(data.x, containerWidth);
                     const nextY = pxToGridY(data.y);
                     const nextX = clampGridX(nextXRaw, block.layout.w);
-                    const nextLayout = { x: nextX, y: nextY, w: block.layout.w, h: block.layout.h };
-
-                    if (isOverlapping(block.id, nextLayout, blocks)) {
-                      return;
-                    }
+                    const effectiveH = getBlockGridH(block, block.layout.w);
+                    const nextLayout = { x: nextX, y: nextY, w: block.layout.w, h: effectiveH };
+                    const resolvedLayout = resolveOverlap(block.id, nextLayout);
 
                     setBlocks((prev) =>
                       prev.map((b) =>
                         b.id === block.id
-                          ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
+                          ? { ...b, layout: { ...b.layout, x: resolvedLayout.x, y: resolvedLayout.y } }
                           : b
                       )
                     );
@@ -904,15 +955,21 @@ export function PageEditor({
                     const nextX = clampGridX(nextXRaw, nextW);
                     const nextY = pxToGridY(position.y);
                     const nextLayout = { x: nextX, y: nextY, w: nextW, h: nextH };
-
-                    if (isOverlapping(block.id, nextLayout, blocks)) {
-                      return;
-                    }
+                    const resolvedLayout = resolveOverlap(block.id, nextLayout);
 
                     setBlocks((prev) =>
                       prev.map((b) =>
                         b.id === block.id
-                          ? { ...b, layout: { ...b.layout, w: nextW, h: nextH, x: nextX, y: nextY } }
+                          ? {
+                              ...b,
+                              layout: {
+                                ...b.layout,
+                                w: resolvedLayout.w,
+                                h: resolvedLayout.h,
+                                x: resolvedLayout.x,
+                                y: resolvedLayout.y,
+                              },
+                            }
                           : b
                       )
                     );
