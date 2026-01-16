@@ -110,7 +110,13 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
       <iframe
         ref={iframeRef}
         src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0&background=0`}
-        className="absolute top-0 left-0 w-full h-full border-0 bg-black z-0 pointer-events-none"
+        className="absolute border-0 bg-black z-0 pointer-events-none"
+        style={{
+          top: -2,
+          left: -2,
+          width: 'calc(100% + 4px)',
+          height: 'calc(100% + 4px)',
+        }}
         frameBorder="0"
         allow="autoplay; fullscreen; picture-in-picture"
       />
