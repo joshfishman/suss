@@ -1170,7 +1170,7 @@ export function PageEditor({
                           top: false,
                           right: true,
                           bottom: true,
-                          left: false,
+                          left: true,
                           topRight: false,
                           bottomRight: false,
                           bottomLeft: false,
