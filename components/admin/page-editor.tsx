@@ -106,7 +106,7 @@ export function PageEditor({
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [showEditControls, setShowEditControls] = useState(editOnPublic);
+  const [showEditControls, setShowEditControls] = useState(true);
   const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
   const [editorInitialTab, setEditorInitialTab] = useState<'upload' | 'existing'>('upload');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -643,7 +643,7 @@ export function PageEditor({
       )}
 
       {/* Admin toolbar - fixed bottom to keep public layout intact */}
-      <div className={`fixed bottom-0 left-0 right-0 z-[60] bg-black text-white ${showEditControls || !editOnPublic ? '' : 'hidden'}`}>
+      <div className={`fixed bottom-0 left-0 right-0 z-[60] bg-black text-white ${showEditControls ? '' : 'hidden'}`}>
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -809,8 +809,8 @@ export function PageEditor({
                 }}
               >
                 <BlockRenderer block={block} isEditing />
-                {(showEditControls || !editOnPublic) && (
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                {showEditControls && (
+                  <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100">
                     <div className="flex gap-2">
                       {block.block_type === 'image' ? (
                         <>
