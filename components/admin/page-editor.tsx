@@ -1359,7 +1359,7 @@ export function PageEditor({
                                 }}
                                 className="bg-white text-black hover:bg-gray-100"
                               >
-                                Edit
+                                Existing
                               </Button>
                               <Button
                                 size="sm"
