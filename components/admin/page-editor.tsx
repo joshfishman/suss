@@ -532,6 +532,25 @@ export function PageEditor({
     );
   }, []);
 
+  const handleUpdateVimeoField = useCallback(
+    (blockId: string, field: 'vimeo_id' | 'title' | 'caption', value: string) => {
+      setBlocks((prev) =>
+        prev.map((block) => {
+          if (block.id !== blockId || block.block_type !== 'vimeo') return block;
+          const content = block.content as { vimeo_id: string; title?: string; caption?: string };
+          return {
+            ...block,
+            content: {
+              ...content,
+              [field]: value,
+            },
+          };
+        })
+      );
+    },
+    []
+  );
+
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !activeUploadBlockId) return;
@@ -847,10 +866,46 @@ export function PageEditor({
               >
                 <BlockRenderer block={block} isEditing />
                 {showEditControls && (
-                  <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100">
-                    <div className="flex gap-2">
-                      {block.block_type === 'image' ? (
-                        <>
+                  <>
+                    {block.block_type === 'vimeo' ? (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2">
+                        <input
+                          type="text"
+                          placeholder="Vimeo ID"
+                          value={(block.content as any)?.vimeo_id || ''}
+                          onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
+                          className="w-full bg-black/60 text-white text-xs px-2 py-1 rounded border border-white/10"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Title"
+                          value={(block.content as any)?.title || ''}
+                          onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
+                          className="w-full bg-black/60 text-white text-xs px-2 py-1 rounded border border-white/10"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Caption"
+                          value={(block.content as any)?.caption || ''}
+                          onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
+                          className="w-full bg-black/60 text-white text-xs px-2 py-1 rounded border border-white/10"
+                        />
+                        <div className="flex justify-end gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteBlock(block.id);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100">
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="secondary"
@@ -873,32 +928,20 @@ export function PageEditor({
                           >
                             Existing
                           </Button>
-                        </>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditBlock(block);
-                          }}
-                          className="bg-white text-black hover:bg-gray-100"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteBlock(block.id);
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteBlock(block.id);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}
