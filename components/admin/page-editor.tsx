@@ -159,14 +159,25 @@ export function PageEditor({
   const imageRatioRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
+    if (!containerRef.current) return;
+
     const updateWidth = () => {
       if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
+        const { width } = containerRef.current.getBoundingClientRect();
+        setContainerWidth(Math.max(0, Math.round(width)));
       }
     };
+
     updateWidth();
+
+    const observer = new ResizeObserver(() => updateWidth());
+    observer.observe(containerRef.current);
     window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
   }, []);
 
   const imageItems = useMemo<ImageItem[]>(() => {
