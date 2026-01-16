@@ -233,22 +233,10 @@ export function PageEditor({
         const ratio =
           size.width > 0 && size.height > 0 ? size.width / size.height : NaN;
         if (!Number.isFinite(ratio)) {
-          console.warn('[image-measurer] invalid size', {
-            url: content.url,
-            width: size.width,
-            height: size.height,
-          });
           return block;
         }
         imageRatioRef.current[block.layout.i] = ratio;
         const newH = ratioToPxH(block.layout.w, ratio, containerWidth);
-        console.log('[image-measurer] apply ratio', {
-          url: content.url,
-          ratio,
-          w: block.layout.w,
-          oldH: block.layout.h,
-          newH,
-        });
         if (block.layout.h !== newH) {
           changed = true;
           normalizedImageLayoutsRef.current.add(block.layout.i);
@@ -348,7 +336,7 @@ export function PageEditor({
             updatedBlocks.push(block);
           }
         } else {
-          await fetch(`/api/content-blocks/${block.id}${draftQuery}`, {
+          const response = await fetch(`/api/content-blocks/${block.id}${draftQuery}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -357,6 +345,10 @@ export function PageEditor({
               sort_order: i,
             }),
           });
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to update block ${block.id}: ${errorText}`);
+          }
           updatedBlocks.push(block);
         }
       }
@@ -384,6 +376,7 @@ export function PageEditor({
 
   // Trigger auto-save on changes
   useEffect(() => {
+    if (readOnly) return;
     if (isSavingSyncRef.current) return;
     const hasChanges = 
       title !== lastAttemptRef.current.title ||
@@ -408,7 +401,7 @@ export function PageEditor({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, description, blocks, performSave]);
+  }, [title, description, blocks, performSave, readOnly]);
 
   // No aspect ratio tracking (simplified editor)
 

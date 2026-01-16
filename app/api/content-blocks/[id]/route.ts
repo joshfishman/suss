@@ -23,14 +23,17 @@ export async function PUT(
     .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
     .update({ content, layout, sort_order })
     .eq('id', id)
-    .select()
-    .single();
+    .select();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: 'Content block not found' }, { status: 404 });
+  }
+
+  return NextResponse.json(data[0]);
 }
 
 export async function DELETE(
