@@ -57,7 +57,7 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
 
   return (
     <div
-      className="relative w-full h-full group overflow-hidden bg-black"
+      className={`relative w-full group overflow-hidden bg-black ${isEditing ? 'h-full' : 'aspect-video'}`}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
