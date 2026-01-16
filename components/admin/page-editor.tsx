@@ -130,6 +130,9 @@ export function PageEditor({
   const [projectPreviews, setProjectPreviews] = useState<
     { id: string; slug: string; title: string; first_block: ContentBlock | null }[]
   >([]);
+  const [pageOptions, setPageOptions] = useState<
+    { id: string; slug: string; title: string; page_type?: string }[]
+  >([]);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [showEditControls, setShowEditControls] = useState(!readOnly);
   const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
@@ -187,6 +190,26 @@ export function PageEditor({
       window.removeEventListener('resize', updateWidth);
     };
   }, []);
+
+  useEffect(() => {
+    if (readOnly) return;
+    let cancelled = false;
+    const loadPages = async () => {
+      try {
+        const response = await fetch('/api/admin/pages');
+        const data = await response.json();
+        if (!cancelled && response.ok) {
+          setPageOptions(data.pages || []);
+        }
+      } catch (error) {
+        console.error('Failed to load pages:', error);
+      }
+    };
+    loadPages();
+    return () => {
+      cancelled = true;
+    };
+  }, [readOnly]);
 
   useEffect(() => {
     if (page.slug !== 'home') return;
@@ -1057,13 +1080,33 @@ export function PageEditor({
                   {editOnPublic ? 'Exit' : 'Back'}
                 </Button>
               </Link>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">Page Title</span>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="h-8 w-48 bg-black border-white/20 text-white text-sm"
-                />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400">Page Title</span>
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="h-8 w-48 bg-black border-white/20 text-white text-sm"
+                  />
+                </div>
+                {pageOptions.length > 0 && (
+                  <select
+                    value={page.slug}
+                    onChange={(e) => {
+                      const nextSlug = e.target.value;
+                      if (nextSlug && nextSlug !== page.slug) {
+                        router.push(`/${nextSlug}?edit=1`);
+                      }
+                    }}
+                    className="h-8 w-56 bg-black border border-white/20 text-white text-xs rounded px-2"
+                  >
+                    {pageOptions.map((option) => (
+                      <option key={option.id} value={option.slug}>
+                        {option.title} {option.page_type === 'project' ? '(Project)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
             
