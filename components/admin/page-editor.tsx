@@ -1158,44 +1158,7 @@ export function PageEditor({
                               </Button>
                             </div>
                           </div>
-                        ) : (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex justify-end gap-2 pointer-events-none">
-                            <div className="flex gap-2 pointer-events-auto">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUploadButton(block);
-                                }}
-                                className="bg-white text-black hover:bg-gray-100"
-                              >
-                                Upload
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectExisting(block);
-                                }}
-                                className="bg-white text-black hover:bg-gray-100"
-                              >
-                                Existing
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteBlock(block.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                        ) : null}
                       </>
                     )}
                   </div>
