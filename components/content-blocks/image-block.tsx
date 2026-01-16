@@ -34,7 +34,7 @@ export function ImageBlock({ content, isEditing = false }: ImageBlockProps) {
           src={content.url}
           alt={content.alt || ''}
           fill
-          className={isEditing ? 'object-contain' : 'object-cover'}
+          className="object-contain"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
       </div>
