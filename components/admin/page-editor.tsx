@@ -163,8 +163,12 @@ export function PageEditor({
 
     const updateWidth = () => {
       if (containerRef.current) {
-        const { width } = containerRef.current.getBoundingClientRect();
-        setContainerWidth(Math.max(0, Math.round(width)));
+        const rect = containerRef.current.getBoundingClientRect();
+        const styles = window.getComputedStyle(containerRef.current);
+        const paddingX =
+          parseFloat(styles.paddingLeft || '0') + parseFloat(styles.paddingRight || '0');
+        const innerWidth = rect.width - paddingX;
+        setContainerWidth(Math.max(0, Math.round(innerWidth)));
       }
     };
 
