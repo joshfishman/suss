@@ -65,6 +65,14 @@
   body {
     @apply bg-background text-foreground font-light;
   }
+  ::selection {
+    background: #f97316;
+    color: #0b0b0b;
+  }
+  ::-moz-selection {
+    background: #f97316;
+    color: #0b0b0b;
+  }
 }
 
 /* Onecrew-inspired minimalist styles */

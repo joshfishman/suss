@@ -1096,7 +1096,7 @@ export function PageEditor({
                   e.currentTarget.blur();
                 }
               }}
-              className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
+              className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text"
               data-placeholder="Page Title"
             >
               {title}
@@ -1106,7 +1106,7 @@ export function PageEditor({
               contentEditable
               suppressContentEditableWarning
               onBlur={(e) => setDescription(e.currentTarget.textContent || '')}
-              className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl outline-none focus:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-text"
+              className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl outline-none focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text"
               data-placeholder="Click to add a description..."
             >
               {description || ''}
