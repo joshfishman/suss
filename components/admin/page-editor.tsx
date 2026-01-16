@@ -221,7 +221,16 @@ export function PageEditor({
           return block;
         }
 
-        const ratio = size.width / size.height;
+        const ratio =
+          size.width > 0 && size.height > 0 ? size.width / size.height : NaN;
+        if (!Number.isFinite(ratio)) {
+          console.warn('[image-measurer] invalid size', {
+            url: content.url,
+            width: size.width,
+            height: size.height,
+          });
+          return block;
+        }
         imageRatioRef.current[block.layout.i] = ratio;
         const newH = Math.max(1, Math.round(block.layout.w / ratio));
         console.log('[image-measurer] apply ratio', {
@@ -403,7 +412,12 @@ export function PageEditor({
       if (!content?.url) return imageRatioRef.current[block.layout.i] || 1;
       const size = measuredSizes[content.url];
       if (!size) return imageRatioRef.current[block.layout.i] || 1;
-      return size.width / size.height;
+      const ratio =
+        size.width > 0 && size.height > 0 ? size.width / size.height : NaN;
+      if (!Number.isFinite(ratio)) {
+        return imageRatioRef.current[block.layout.i] || 1;
+      }
+      return ratio;
     }
     return null;
   }, [measuredSizes]);
