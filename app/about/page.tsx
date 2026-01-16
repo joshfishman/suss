@@ -1,9 +1,6 @@
 import { Suspense } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { PageViewer } from '@/components/page-viewer';
-import { PageHero } from '@/components/page-hero';
-import { PageShell } from '@/components/page-shell';
 import { PageEditor } from '@/components/admin/page-editor';
 import { getPageData } from '@/lib/drafts';
 
@@ -36,13 +33,11 @@ async function PageContent({ editMode }: { editMode: boolean }) {
   }
 
   return (
-    <>
-      <PageHero 
-        title={page.title} 
-        description={page.description} 
-      />
-      <PageViewer blocks={blocks || []} />
-    </>
+    <PageEditor
+      page={page}
+      initialBlocks={blocks || []}
+      readOnly
+    />
   );
 }
 
@@ -71,10 +66,8 @@ export default async function AboutPage({
   }
 
   return (
-    <PageShell>
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-        <PageContent editMode={false} />
-      </Suspense>
-    </PageShell>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <PageContent editMode={false} />
+    </Suspense>
   );
 }

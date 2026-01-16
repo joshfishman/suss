@@ -125,6 +125,7 @@ interface PageEditorProps {
   draftMode?: boolean;
   editOnPublic?: boolean;
   exitHref?: string;
+  readOnly?: boolean;
 }
 
 export function PageEditor({
@@ -133,6 +134,7 @@ export function PageEditor({
   draftMode = false,
   editOnPublic = false,
   exitHref,
+  readOnly = false,
 }: PageEditorProps) {
   const router = useRouter();
   const [blocks, setBlocks] = useState<ContentBlock[]>(() => normalizeInitialBlocks(initialBlocks));
@@ -143,7 +145,7 @@ export function PageEditor({
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [showEditControls, setShowEditControls] = useState(true);
+  const [showEditControls, setShowEditControls] = useState(!readOnly);
   const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
   const [editorInitialTab, setEditorInitialTab] = useState<'upload' | 'existing'>('upload');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -682,18 +684,20 @@ export function PageEditor({
 
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col" {...getRootProps()}>
-      <input {...getInputProps()} />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileInputChange}
-      />
+    <div className="min-h-screen bg-black text-white flex flex-col" {...(readOnly ? {} : getRootProps())}>
+      {!readOnly && <input {...getInputProps()} />}
+      {!readOnly && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileInputChange}
+        />
+      )}
       
       {/* Drag overlay */}
-      {isDragActive && (
+      {!readOnly && isDragActive && (
         <div className="fixed inset-0 bg-blue-500/20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg p-8 shadow-xl">
             <ImageIcon className="w-16 h-16 mx-auto mb-4 text-blue-500" />
@@ -703,7 +707,7 @@ export function PageEditor({
       )}
 
       {/* Edit toggle */}
-      {editOnPublic && (
+      {editOnPublic && !readOnly && (
         <button
           type="button"
           onClick={() => setShowEditControls((prev) => !prev)}
@@ -714,14 +718,15 @@ export function PageEditor({
       )}
 
       {/* Edit mode badge */}
-      {editOnPublic && (
+      {editOnPublic && !readOnly && (
         <div className="fixed top-4 left-4 z-[80] bg-white text-black px-3 py-1 rounded-full text-xs font-medium shadow">
           Edit Mode
         </div>
       )}
 
       {/* Admin toolbar - fixed top so it's always visible in edit mode */}
-      <div className={`fixed top-0 left-0 right-0 z-[70] bg-black/95 backdrop-blur border-b border-white/10 text-white shadow ${showEditControls ? '' : 'hidden'}`}>
+      {!readOnly && (
+        <div className={`fixed top-0 left-0 right-0 z-[70] bg-black/95 backdrop-blur border-b border-white/10 text-white shadow ${showEditControls ? '' : 'hidden'}`}>
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -798,11 +803,12 @@ export function PageEditor({
           </div>
         </div>
       </div>
+      )}
 
       {/* Site header - matches public layout */}
       <SiteHeader />
 
-      <main className="pt-32 flex-1">
+      <main className={`${readOnly ? 'pt-20' : 'pt-32'} flex-1`}>
         {/* Page hero - editable (matches public styling) */}
         <section className="py-20 px-8">
           <div className="container mx-auto max-w-4xl">
@@ -871,8 +877,8 @@ export function PageEditor({
                   resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW + GRID_GAP]}
                   minWidth={gridToPxW(1, containerWidth)}
                   maxWidth={gridToPxW(4, containerWidth)}
-                  enableResizing={showEditControls}
-                  disableDragging={!showEditControls}
+                  enableResizing={!readOnly && showEditControls}
+                  disableDragging={readOnly || !showEditControls}
                   onDragStop={(_, data) => {
                     const nextXRaw = pxToGridX(data.x, containerWidth);
                     const nextY = pxToGridY(data.y);
@@ -929,7 +935,7 @@ export function PageEditor({
                     }}
                   >
                     <BlockRenderer block={block} isEditing />
-                    {showEditControls && (
+                    {!readOnly && showEditControls && (
                       <>
                         {block.block_type === 'vimeo' ? (
                           <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2">
