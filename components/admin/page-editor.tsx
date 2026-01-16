@@ -12,27 +12,11 @@ import { ArrowLeft, Trash2, Edit, Video, Image as ImageIcon, Check, Loader2 } fr
 import Link from 'next/link';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import ImageMeasurer from 'react-virtualized-image-measurer';
 
 interface ImageItem {
   id: string;
   layoutId: string;
   url: string;
-}
-
-function ImageSizeCollector({
-  sizes,
-  onChange,
-}: {
-  sizes: Record<string, { width: number; height: number }>;
-  onChange: (sizes: Record<string, { width: number; height: number }>) => void;
-}) {
-  useEffect(() => {
-    console.log('[image-measurer] collector sizes', sizes);
-    onChange(sizes);
-  }, [sizes, onChange]);
-
-  return null;
 }
 
 function createBlockId(prefix: string) {
@@ -182,7 +166,7 @@ export function PageEditor({
   }, []);
 
   const imageItems = useMemo<ImageItem[]>(() => {
-    const items = blocks
+    return blocks
       .filter((block) => block.block_type === 'image')
       .map((block) => {
         const content = block.content as { url?: string };
@@ -191,19 +175,40 @@ export function PageEditor({
           : null;
       })
       .filter((item): item is ImageItem => Boolean(item));
-    console.log('[image-measurer] imageItems', items);
-    return items;
   }, [blocks]);
 
-  const handleSizesChange = useCallback(
-    (sizes: Record<string, { width: number; height: number }>) => {
-      if (sizesChanged(measuredSizes, sizes)) {
-        console.log('[image-measurer] sizes', sizes);
-        setMeasuredSizes(sizes);
+  useEffect(() => {
+    if (imageItems.length === 0) return;
+
+    let cancelled = false;
+    const nextSizes: Record<string, { width: number; height: number }> = {};
+
+    const loadImages = async () => {
+      await Promise.all(
+        imageItems.map(
+          (item) =>
+            new Promise<void>((resolve) => {
+              const img = new window.Image();
+              img.onload = () => {
+                nextSizes[item.url] = { width: img.naturalWidth, height: img.naturalHeight };
+                resolve();
+              };
+              img.onerror = () => resolve();
+              img.src = item.url;
+            })
+        )
+      );
+
+      if (!cancelled && sizesChanged(measuredSizes, nextSizes)) {
+        setMeasuredSizes(nextSizes);
       }
-    },
-    [measuredSizes]
-  );
+    };
+
+    loadImages();
+    return () => {
+      cancelled = true;
+    };
+  }, [imageItems, measuredSizes]);
 
   useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
@@ -1007,20 +1012,7 @@ export function PageEditor({
       {/* Site footer - same as front end */}
       <SiteFooter />
 
-      {imageItems.length > 0 && (
-        <div className="sr-only">
-          <ImageMeasurer
-            items={imageItems}
-            image={(item: ImageItem) => item.url}
-            defaultWidth={400}
-            defaultHeight={300}
-          >
-            {({ sizes }: { sizes: Record<string, { width: number; height: number }> }) => (
-              <ImageSizeCollector sizes={sizes} onChange={handleSizesChange} />
-            )}
-          </ImageMeasurer>
-        </div>
-      )}
+      {/* Image sizes are measured via Image() loader */}
 
       {/* Block editor modal */}
       {editingBlock && (
