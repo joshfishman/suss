@@ -864,15 +864,7 @@ export function PageEditor({
         />
       )}
       
-      {/* Drag overlay */}
-      {!readOnly && isDragActive && (
-        <div className="fixed inset-0 bg-blue-500/20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-8 shadow-xl">
-            <ImageIcon className="w-16 h-16 mx-auto mb-4 text-blue-500" />
-            <p className="text-xl font-medium">Drop images here</p>
-          </div>
-        </div>
-      )}
+      {/* Drag overlay removed to allow dropping into blocks */}
 
       {/* Edit toggle */}
       {editOnPublic && !readOnly && (
