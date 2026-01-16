@@ -842,7 +842,7 @@ export function PageEditor({
         </section>
 
         {/* Content grid */}
-        <div className="container mx-auto px-8 pb-24 max-w-6xl" ref={containerRef}>
+        <div className="container mx-auto px-8 pb-24" ref={containerRef}>
         {blocks.length === 0 ? (
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
             <p className="text-gray-400 mb-4">Drag images here or use the toolbar to add content</p>
@@ -858,7 +858,7 @@ export function PageEditor({
             </div>
           </div>
         ) : (
-          <div className="relative w-full min-h-[400px] overflow-hidden">
+          <div className="relative w-full min-h-[400px]">
             {blocks.map((block) => {
               const ratio = getRatioForBlock(block);
               const widthPx = gridToPxW(block.layout.w, containerWidth);
