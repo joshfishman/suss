@@ -20,7 +20,7 @@ export function TextBlock({ content, isEditing = false }: TextBlockProps) {
   };
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center p-4">
+    <div className="relative w-full h-full flex items-center justify-center px-0 py-4">
       <div
         dir="ltr"
         className={`${getClassName()} text-left`}
