@@ -98,8 +98,6 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
         // Use paddingBottom trick for aspect ratio when not in editor
         paddingBottom: isEditing ? undefined : '56.25%',
         height: isEditing ? '100%' : 0,
-        // Inset shadow to cover any edge artifacts
-        boxShadow: 'inset 0 0 0 1px black',
       }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
@@ -116,6 +114,8 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
         frameBorder="0"
         allow="autoplay; fullscreen; picture-in-picture"
       />
+      {/* Top edge cover to hide Vimeo letterbox line */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-black z-[1]" />
       <button
         type="button"
         onClick={(event) => {
