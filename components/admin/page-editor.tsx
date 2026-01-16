@@ -301,6 +301,37 @@ export function PageEditor({
             }),
           });
 
+          if (response.ok) {
+            let payload: { missing?: boolean } | null = null;
+            try {
+              payload = await response.json();
+            } catch (error) {
+              payload = null;
+            }
+
+            if (payload?.missing) {
+              const recreateResponse = await fetch(`/api/content-blocks${draftQuery}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  page_id: page.id,
+                  block_type: block.block_type,
+                  content: block.content,
+                  layout: block.layout,
+                  sort_order: i,
+                }),
+              });
+              if (recreateResponse.ok) {
+                const data = await recreateResponse.json();
+                updatedBlocks.push({ ...block, id: data.id });
+                continue;
+              }
+            }
+
+            updatedBlocks.push(block);
+            continue;
+          }
+
           if (response.status === 404) {
             // Block missing (out-of-sync). Recreate it.
             const recreateResponse = await fetch(`/api/content-blocks${draftQuery}`, {

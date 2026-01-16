@@ -30,7 +30,7 @@ export async function PUT(
   }
 
   if (!data || data.length === 0) {
-    return NextResponse.json({ error: 'Content block not found' }, { status: 404 });
+    return NextResponse.json({ missing: true }, { status: 200 });
   }
 
   return NextResponse.json(data[0]);
