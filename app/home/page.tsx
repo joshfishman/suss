@@ -56,10 +56,17 @@ function isEditMode(searchParams?: { edit?: string | string[] }) {
 
 export default function HomePage({ searchParams }: { searchParams?: { edit?: string | string[] } }) {
   const editMode = isEditMode(searchParams);
+  const editRaw = searchParams?.edit;
+  const editRawText = Array.isArray(editRaw) ? editRaw.join(',') : editRaw;
 
   if (editMode) {
     return (
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+        {editRaw ? (
+          <div className="fixed top-4 right-4 z-[90] bg-white text-black px-3 py-1 rounded-full text-xs shadow">
+            editRaw={editRawText} editMode=true
+          </div>
+        ) : null}
         <PageContent editMode />
       </Suspense>
     );
@@ -67,6 +74,11 @@ export default function HomePage({ searchParams }: { searchParams?: { edit?: str
 
   return (
     <PageShell>
+      {editRaw ? (
+        <div className="fixed top-4 right-4 z-[90] bg-white text-black px-3 py-1 rounded-full text-xs shadow">
+          editRaw={editRawText} editMode=false
+        </div>
+      ) : null}
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
         <PageContent editMode={false} />
       </Suspense>
