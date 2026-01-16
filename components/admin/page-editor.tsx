@@ -874,21 +874,21 @@ export function PageEditor({
                           placeholder="Vimeo ID"
                           value={(block.content as any)?.vimeo_id || ''}
                           onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
-                          className="w-full bg-black/60 text-white text-xs px-2 py-1 rounded border border-white/10"
+                          className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                         />
                         <input
                           type="text"
                           placeholder="Title"
                           value={(block.content as any)?.title || ''}
                           onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
-                          className="w-full bg-black/60 text-white text-xs px-2 py-1 rounded border border-white/10"
+                          className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                         />
                         <input
                           type="text"
                           placeholder="Caption"
                           value={(block.content as any)?.caption || ''}
                           onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
-                          className="w-full bg-black/60 text-white text-xs px-2 py-1 rounded border border-white/10"
+                          className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                         />
                         <div className="flex justify-end gap-2 pt-1">
                           <Button
