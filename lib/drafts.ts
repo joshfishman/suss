@@ -25,7 +25,7 @@ async function ensureDrafts(slug: string) {
     .single();
 
   if (!draftPage) {
-    const { data: createdDraft } = await supabase
+    const { data: createdDraft, error: createdDraftError } = await supabase
       .from('pages_drafts')
       .insert({
         slug: livePage.slug,
@@ -36,6 +36,10 @@ async function ensureDrafts(slug: string) {
       })
       .select()
       .single();
+
+    if (createdDraftError || !createdDraft) {
+      return { page: null, blocks: [] as ContentBlock[] };
+    }
 
     draftPage = createdDraft;
 
