@@ -964,12 +964,7 @@ export function PageEditor({
         </button>
       )}
 
-      {/* Edit mode badge */}
-      {editOnPublic && !readOnly && (
-        <div className="fixed top-4 left-4 z-[80] bg-white text-black px-3 py-1 rounded-full text-xs font-medium shadow">
-          Edit Mode
-        </div>
-      )}
+      {/* Edit mode badge removed */}
 
       {/* Admin toolbar - fixed top so it's always visible in edit mode */}
       {!readOnly && (
@@ -1285,8 +1280,8 @@ export function PageEditor({
                             </div>
                           </div>
                         ) : (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end gap-2 pointer-events-none">
-                            <div className="flex gap-2 pointer-events-auto">
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex flex-col gap-2 pointer-events-none">
+                            <div className="flex gap-2 pointer-events-auto justify-end">
                               <Button
                                 size="sm"
                                 variant="secondary"
@@ -1308,6 +1303,40 @@ export function PageEditor({
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
+                            </div>
+                            <div className="flex flex-col gap-2 pointer-events-auto">
+                              <input
+                                type="text"
+                                placeholder="Alt text"
+                                value={(block.content as any)?.alt || ''}
+                                onChange={(e) => {
+                                  const content = block.content as { url?: string; alt?: string; caption?: string };
+                                  handleSaveBlock({
+                                    ...block,
+                                    content: {
+                                      ...content,
+                                      alt: e.target.value,
+                                    },
+                                  });
+                                }}
+                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Caption"
+                                value={(block.content as any)?.caption || ''}
+                                onChange={(e) => {
+                                  const content = block.content as { url?: string; alt?: string; caption?: string };
+                                  handleSaveBlock({
+                                    ...block,
+                                    content: {
+                                      ...content,
+                                      caption: e.target.value,
+                                    },
+                                  });
+                                }}
+                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                              />
                             </div>
                           </div>
                         )}
