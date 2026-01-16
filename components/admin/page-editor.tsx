@@ -642,8 +642,8 @@ export function PageEditor({
         </button>
       )}
 
-      {/* Admin toolbar - fixed bottom to keep public layout intact */}
-      <div className={`fixed bottom-0 left-0 right-0 z-[60] bg-black text-white ${showEditControls ? '' : 'hidden'}`}>
+      {/* Admin toolbar - fixed top so it's always visible in edit mode */}
+      <div className={`fixed top-0 left-0 right-0 z-[70] bg-black text-white ${showEditControls ? '' : 'hidden'}`}>
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -724,7 +724,7 @@ export function PageEditor({
       {/* Site header - matches public layout */}
       <SiteHeader />
 
-      <main className="pt-20 flex-1">
+      <main className="pt-32 flex-1">
         {/* Page hero - editable (matches public styling) */}
         <section className="py-20 px-8">
           <div className="container mx-auto max-w-4xl">
