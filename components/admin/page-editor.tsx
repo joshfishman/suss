@@ -46,7 +46,7 @@ function sizesChanged(
 
 const GRID_COLS = 4;
 const GRID_GAP = 16;
-const GRID_ROW = 20;
+const GRID_ROW = 320; // 20rem row snap
 
 function colWidth(containerWidth: number) {
   return (containerWidth - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
@@ -74,6 +74,11 @@ function gridToPxY(y: number) {
 
 function pxToGridY(px: number) {
   return Math.max(0, Math.round(px / GRID_ROW));
+}
+
+function ratioToGridH(w: number, ratio: number, containerWidth: number) {
+  const widthPx = gridToPxW(w, containerWidth);
+  return Math.max(1, Math.round((widthPx / ratio) / GRID_ROW));
 }
 
 function clampGridX(x: number, w: number) {
@@ -237,7 +242,7 @@ export function PageEditor({
           return block;
         }
         imageRatioRef.current[block.layout.i] = ratio;
-        const newH = Math.max(1, Math.round(block.layout.w / ratio));
+        const newH = ratioToGridH(block.layout.w, ratio, containerWidth);
         console.log('[image-measurer] apply ratio', {
           url: content.url,
           ratio,
@@ -282,7 +287,7 @@ export function PageEditor({
       let changed = false;
       const next = prev.map((block) => {
         if (block.block_type !== 'vimeo') return block;
-        const nextH = Math.max(1, Math.round(block.layout.w / (16 / 9)));
+      const nextH = ratioToGridH(block.layout.w, 16 / 9, containerWidth);
         if (block.layout.h === nextH) return block;
         changed = true;
         return { ...block, layout: { ...block.layout, h: nextH } };
@@ -440,7 +445,7 @@ export function PageEditor({
     
     // Simple default sizing
     const blockW = 2;
-    const blockH = type === 'vimeo' ? Math.max(1, Math.round(blockW / (16 / 9))) : 1;
+    const blockH = type === 'vimeo' ? ratioToGridH(blockW, 16 / 9, containerWidth) : 1;
 
     const newBlock: ContentBlock = {
       id: createBlockId('temp'),
@@ -864,6 +869,8 @@ export function PageEditor({
                   lockAspectRatio={ratio ?? false}
                   dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW]}
                   resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW]}
+                  minWidth={gridToPxW(1, containerWidth)}
+                  maxWidth={gridToPxW(4, containerWidth)}
                   enableResizing={showEditControls}
                   disableDragging={!showEditControls}
                   onDragStop={(_, data) => {
@@ -886,7 +893,7 @@ export function PageEditor({
                   }}
                   onResizeStop={(_, __, ___, delta, position) => {
                     const nextW = pxToGridW(widthPx + delta.width, containerWidth);
-                    const nextH = ratio ? Math.max(1, Math.round(nextW / ratio)) : block.layout.h;
+                    const nextH = ratio ? ratioToGridH(nextW, ratio, containerWidth) : block.layout.h;
                     const nextXRaw = pxToGridX(position.x, containerWidth);
                     const nextX = clampGridX(nextXRaw, nextW);
                     const nextY = pxToGridY(position.y);
