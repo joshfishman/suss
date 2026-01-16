@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import GridLayout, { Layout, LayoutItem } from 'react-grid-layout';
@@ -14,12 +14,51 @@ import { ArrowLeft, Trash2, Edit, Video, Image as ImageIcon, Check, Loader2 } fr
 import Link from 'next/link';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
+import ImageMeasurer from 'react-virtualized-image-measurer';
+
+interface ImageItem {
+  id: string;
+  layoutId: string;
+  url: string;
+}
+
+function ImageSizeCollector({
+  sizes,
+  onChange,
+}: {
+  sizes: Record<string, { width: number; height: number }>;
+  onChange: (sizes: Record<string, { width: number; height: number }>) => void;
+}) {
+  useEffect(() => {
+    onChange(sizes);
+  }, [sizes, onChange]);
+
+  return null;
+}
 
 function createBlockId(prefix: string) {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
   }
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function sizesChanged(
+  prev: Record<string, { width: number; height: number }>,
+  next: Record<string, { width: number; height: number }>
+) {
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(next);
+  if (prevKeys.length !== nextKeys.length) return true;
+  for (const key of nextKeys) {
+    const prevSize = prev[key];
+    const nextSize = next[key];
+    if (!prevSize || !nextSize) return true;
+    if (prevSize.width !== nextSize.width || prevSize.height !== nextSize.height) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function normalizeInitialBlocks(blocks: ContentBlock[]) {
@@ -64,6 +103,8 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
   const lastAttemptRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
   const isSavingSyncRef = useRef(false);
+  const normalizedImageLayoutsRef = useRef(new Set<string>());
+  const [measuredSizes, setMeasuredSizes] = useState<Record<string, { width: number; height: number }>>({});
 
   useEffect(() => {
     const updateWidth = () => {
@@ -75,6 +116,62 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     window.addEventListener('resize', updateWidth);
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
+
+  const imageItems = useMemo<ImageItem[]>(() => {
+    return blocks
+      .filter((block) => block.block_type === 'image')
+      .map((block) => {
+        const content = block.content as { url?: string };
+        return content?.url
+          ? { id: block.id, layoutId: block.layout.i, url: content.url }
+          : null;
+      })
+      .filter((item): item is ImageItem => Boolean(item));
+  }, [blocks]);
+
+  const handleSizesChange = useCallback(
+    (sizes: Record<string, { width: number; height: number }>) => {
+      if (sizesChanged(measuredSizes, sizes)) {
+        setMeasuredSizes(sizes);
+      }
+    },
+    [measuredSizes]
+  );
+
+  useEffect(() => {
+    if (!Object.keys(measuredSizes).length) return;
+    setBlocks((prev) => {
+      let changed = false;
+      const next = prev.map((block) => {
+        if (block.block_type !== 'image') return block;
+        const content = block.content as { url?: string };
+        if (!content?.url) return block;
+
+        const size = measuredSizes[content.url];
+        if (!size) return block;
+
+        if (normalizedImageLayoutsRef.current.has(block.layout.i)) {
+          return block;
+        }
+
+        const ratio = size.width / size.height;
+        const newH = Math.max(1, Math.round(block.layout.w / ratio));
+        if (block.layout.h !== newH) {
+          changed = true;
+          normalizedImageLayoutsRef.current.add(block.layout.i);
+          return {
+            ...block,
+            layout: { ...block.layout, h: newH },
+          };
+        }
+
+        normalizedImageLayoutsRef.current.add(block.layout.i);
+        return block;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [measuredSizes]);
 
   // Auto-save function
   const performSave = useCallback(async () => {
@@ -220,7 +317,52 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
     );
   }, []);
 
-  // No custom resize handlers (keep default behavior)
+  const getRatioForBlock = useCallback((block: ContentBlock) => {
+    if (block.block_type === 'vimeo') {
+      return 16 / 9;
+    }
+    if (block.block_type === 'image') {
+      const content = block.content as { url?: string };
+      if (!content?.url) return null;
+      const size = measuredSizes[content.url];
+      if (!size) return null;
+      return size.width / size.height;
+    }
+    return null;
+  }, [measuredSizes]);
+
+  const handleResize = useCallback((
+    layout: Layout,
+    oldItem: LayoutItem,
+    newItem: LayoutItem,
+    placeholder: LayoutItem
+  ) => {
+    const block = blocks.find((b) => b.layout.i === newItem.i);
+    if (!block) return;
+    const ratio = getRatioForBlock(block);
+    if (!ratio) return;
+
+    const widthChanged = newItem.w !== oldItem.w;
+    const heightChanged = newItem.h !== oldItem.h;
+
+    if (widthChanged) {
+      const newHeight = Math.max(1, Math.round(newItem.w / ratio));
+      newItem.h = newHeight;
+      placeholder.h = newHeight;
+    } else if (heightChanged) {
+      const newWidth = Math.max(1, Math.round(newItem.h * ratio));
+      newItem.w = newWidth;
+      placeholder.w = newWidth;
+    }
+  }, [blocks, getRatioForBlock]);
+
+  const handleResizeStop = useCallback((
+    layout: Layout,
+    oldItem: LayoutItem,
+    newItem: LayoutItem
+  ) => {
+    // Keep ratios locked; no updates needed here
+  }, []);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     // Find first row (y=0) and calculate used width there
@@ -506,12 +648,16 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
             layout={layout}
             width={containerWidth}
             onLayoutChange={handleLayoutChange}
+            onResize={handleResize}
+            onResizeStop={handleResizeStop}
             gridConfig={{
               cols: 4,
               rowHeight: 100,
               margin: [16, 16] as const,
               containerPadding: [0, 0] as const,
             }}
+            dragConfig={{ enabled: true }}
+            resizeConfig={{ enabled: true }}
           >
             {blocks.map((block) => (
               <div
@@ -553,6 +699,21 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
       {/* Site footer - same as front end */}
       <SiteFooter />
+
+      {imageItems.length > 0 && (
+        <div className="sr-only">
+          <ImageMeasurer
+            items={imageItems}
+            image={(item: ImageItem) => item.url}
+            defaultWidth={400}
+            defaultHeight={300}
+          >
+            {({ sizes }) => (
+              <ImageSizeCollector sizes={sizes} onChange={handleSizesChange} />
+            )}
+          </ImageMeasurer>
+        </div>
+      )}
 
       {/* Block editor modal */}
       {editingBlock && (
