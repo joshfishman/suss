@@ -259,9 +259,10 @@ export function PageEditor({
         return block;
       });
 
-      return changed ? next : prev;
+      if (!changed) return prev;
+      return resolveAllOverlaps(next);
     });
-  }, [measuredSizes, containerWidth]);
+  }, [measuredSizes, containerWidth, resolveAllOverlaps]);
 
   useEffect(() => {
     blocks.forEach((block) => {
@@ -288,9 +289,10 @@ export function PageEditor({
         changed = true;
         return { ...block, layout: { ...block.layout, h: nextH } };
       });
-      return changed ? next : prev;
+      if (!changed) return prev;
+      return resolveAllOverlaps(next);
     });
-  }, [containerWidth]);
+  }, [containerWidth, resolveAllOverlaps]);
 
   // Auto-save function
   const performSave = useCallback(async () => {
@@ -1105,8 +1107,8 @@ export function PageEditor({
                             </div>
                           </div>
                         ) : (
-                          <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100">
-                            <div className="flex gap-2">
+                          <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100 pointer-events-none">
+                            <div className="flex gap-2 pointer-events-auto">
                               <Button
                                 size="sm"
                                 variant="secondary"
