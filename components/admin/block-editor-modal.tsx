@@ -120,15 +120,19 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
                   <p className="text-sm text-gray-400">No images yet. Upload one first.</p>
                 )}
                 {!loadingImages && existingImages.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-56 overflow-y-auto pr-1">
                     {existingImages.map((image) => (
                       <button
                         key={image.url}
                         type="button"
-                        onClick={() => setContent({ ...imageContent, url: image.url })}
+                        onClick={() => {
+                          const nextContent = { ...imageContent, url: image.url };
+                          setContent(nextContent);
+                          onSave({ ...block, content: nextContent });
+                        }}
                         className={`relative rounded-lg overflow-hidden border ${imageContent.url === image.url ? 'border-white' : 'border-gray-700'} hover:border-white transition-colors`}
                       >
-                        <img src={image.url} alt={image.name} className="w-full h-24 object-cover" />
+                        <img src={image.url} alt={image.name} className="w-full h-20 object-cover" />
                       </button>
                     ))}
                   </div>
@@ -136,7 +140,11 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
               </div>
             )}
             {imageContent.url && (
-              <img src={imageContent.url} alt="Preview" className="w-full rounded-lg" />
+              <img
+                src={imageContent.url}
+                alt="Preview"
+                className="w-full max-h-48 object-contain rounded-lg bg-black/20"
+              />
             )}
             <div>
               <Label htmlFor="alt" className="text-white">Alt Text</Label>
@@ -227,7 +235,7 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+      <div className="bg-gray-800 rounded-lg p-4 max-w-xl w-full max-h-[80vh] overflow-y-auto border border-gray-700">
         <h2 className="text-2xl font-bold mb-4 text-white">Edit {block.block_type} Block</h2>
         {renderEditor()}
         <div className="flex justify-end gap-2 mt-6">

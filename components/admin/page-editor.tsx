@@ -1159,7 +1159,7 @@ export function PageEditor({
                             </div>
                           </div>
                         ) : (
-                          <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100 pointer-events-none">
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex justify-end gap-2 pointer-events-none">
                             <div className="flex gap-2 pointer-events-auto">
                               <Button
                                 size="sm"
