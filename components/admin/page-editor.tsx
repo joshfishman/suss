@@ -846,7 +846,7 @@ export function PageEditor({
             {blocks.map((block) => {
               const ratio = getRatioForBlock(block);
               const widthPx = gridToPxW(block.layout.w, containerWidth);
-              const heightPx = gridToPxY(block.layout.h);
+              const heightPx = ratio ? widthPx / ratio : gridToPxY(block.layout.h);
               const xPx = gridToPxX(block.layout.x, containerWidth);
               const yPx = gridToPxY(block.layout.y);
 
