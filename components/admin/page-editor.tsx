@@ -152,9 +152,11 @@ export function PageEditor({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
   const lastAttemptRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
+  const lastAttemptHashRef = useRef(JSON.stringify(initialBlocks));
   const isSavingSyncRef = useRef(false);
   const normalizedImageLayoutsRef = useRef(new Set<string>());
   const [measuredSizes, setMeasuredSizes] = useState<Record<string, { width: number; height: number }>>({});
+  const measuredSizesRef = useRef<Record<string, { width: number; height: number }>>({});
   const lastImageUrlByLayoutRef = useRef<Record<string, string>>({});
   const imageRatioRef = useRef<Record<string, number>>({});
 
@@ -196,6 +198,12 @@ export function PageEditor({
       .filter((item): item is ImageItem => Boolean(item));
   }, [blocks]);
 
+  const blocksHash = useMemo(() => JSON.stringify(blocks), [blocks]);
+
+  useEffect(() => {
+    measuredSizesRef.current = measuredSizes;
+  }, [measuredSizes]);
+
   useEffect(() => {
     if (imageItems.length === 0) return;
 
@@ -218,7 +226,7 @@ export function PageEditor({
         )
       );
 
-      if (!cancelled && sizesChanged(measuredSizes, nextSizes)) {
+      if (!cancelled && sizesChanged(measuredSizesRef.current, nextSizes)) {
         setMeasuredSizes(nextSizes);
       }
     };
@@ -227,7 +235,7 @@ export function PageEditor({
     return () => {
       cancelled = true;
     };
-  }, [imageItems, measuredSizes]);
+  }, [imageItems]);
 
   useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
@@ -267,7 +275,7 @@ export function PageEditor({
 
       return changed ? next : prev;
     });
-  }, [measuredSizes]);
+  }, [measuredSizes, containerWidth]);
 
   useEffect(() => {
     blocks.forEach((block) => {
@@ -296,7 +304,7 @@ export function PageEditor({
       });
       return changed ? next : prev;
     });
-  }, []);
+  }, [blocks, containerWidth]);
 
   // Auto-save function
   const performSave = useCallback(async () => {
@@ -395,12 +403,14 @@ export function PageEditor({
 
       lastSavedRef.current = { title, description, blocks: updatedBlocks };
       lastAttemptRef.current = { title, description, blocks: updatedBlocks };
+      lastAttemptHashRef.current = JSON.stringify(updatedBlocks);
       setSaveStatus('saved');
     } catch (error) {
       console.error('Save failed:', error);
       setSaveStatus('unsaved');
       // Prevent retry loop until user makes another change
       lastAttemptRef.current = { title, description, blocks };
+      lastAttemptHashRef.current = JSON.stringify(blocks);
     } finally {
       setIsSaving(false);
       // Allow autosave after this cycle completes
@@ -414,10 +424,10 @@ export function PageEditor({
   useEffect(() => {
     if (readOnly) return;
     if (isSavingSyncRef.current) return;
-    const hasChanges = 
+    const hasChanges =
       title !== lastAttemptRef.current.title ||
       description !== lastAttemptRef.current.description ||
-      JSON.stringify(blocks) !== JSON.stringify(lastAttemptRef.current.blocks);
+      blocksHash !== lastAttemptHashRef.current;
 
     if (hasChanges) {
       setSaveStatus('unsaved');
@@ -428,6 +438,7 @@ export function PageEditor({
       
       saveTimeoutRef.current = setTimeout(() => {
         lastAttemptRef.current = { title, description, blocks };
+        lastAttemptHashRef.current = blocksHash;
         performSave();
       }, 1500); // Auto-save after 1.5 seconds of inactivity
     }
@@ -437,7 +448,7 @@ export function PageEditor({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, description, blocks, performSave, readOnly]);
+  }, [title, description, blocksHash, performSave, readOnly]);
 
   // No aspect ratio tracking (simplified editor)
 
@@ -516,7 +527,8 @@ export function PageEditor({
     
     // Simple default sizing
     const blockW = 2;
-    const blockH = type === 'vimeo' ? ratioToPxH(blockW, 16 / 9, containerWidth) : 200;
+    const blockH =
+      type === 'vimeo' ? ratioToPxH(blockW, 16 / 9, containerWidth) : ratioToPxH(blockW, 1, containerWidth);
 
     const newBlock: ContentBlock = {
       id: createBlockId('temp'),
@@ -556,6 +568,8 @@ export function PageEditor({
 
       setBlocks([]);
       lastSavedRef.current = { title, description, blocks: [] };
+      lastAttemptRef.current = { title, description, blocks: [] };
+      lastAttemptHashRef.current = JSON.stringify([]);
       setSaveStatus('saved');
     } catch (error) {
       console.error('Failed to clear blocks:', error);
@@ -701,7 +715,7 @@ export function PageEditor({
           
           // Simple default size for dropped images
           const blockW = 2;
-          const blockH = 1;
+          const blockH = ratioToPxH(blockW, 1, containerWidth);
           
           // Calculate position: place side by side on first row (y=0)
           const allBlocks = [...blocks, ...newBlocks];
@@ -741,7 +755,7 @@ export function PageEditor({
     if (newBlocks.length > 0) {
       setBlocks((prev) => [...prev, ...newBlocks]);
     }
-  }, [blocks, page.id]);
+  }, [blocks, page.id, containerWidth]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
