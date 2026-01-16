@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { Rnd } from 'react-rnd';
-import { Page, ContentBlock } from '@/lib/types/content';
+import { Page, ContentBlock, LayoutMode } from '@/lib/types/content';
 import {
   GRID_COLS,
   GRID_GAP,
@@ -118,6 +118,7 @@ export function PageEditor({
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(page.layout_mode || 'snap');
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [showEditControls, setShowEditControls] = useState(!readOnly);
   const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
@@ -128,8 +129,18 @@ export function PageEditor({
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSavedRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
-  const lastAttemptRef = useRef({ title: page.title, description: page.description || '', blocks: initialBlocks });
+  const lastSavedRef = useRef({
+    title: page.title,
+    description: page.description || '',
+    layoutMode: page.layout_mode || 'snap',
+    blocks: initialBlocks,
+  });
+  const lastAttemptRef = useRef({
+    title: page.title,
+    description: page.description || '',
+    layoutMode: page.layout_mode || 'snap',
+    blocks: initialBlocks,
+  });
   const lastAttemptHashRef = useRef(JSON.stringify(initialBlocks));
   const isSavingSyncRef = useRef(false);
   const normalizedImageLayoutsRef = useRef(new Set<string>());
@@ -253,6 +264,7 @@ export function PageEditor({
         body: JSON.stringify({
           title,
           description,
+          layout_mode: layoutMode,
           published_page_id: page.published_page_id || null,
         }),
       });
@@ -364,15 +376,15 @@ export function PageEditor({
         setBlocks(updatedBlocks);
       }
 
-      lastSavedRef.current = { title, description, blocks: updatedBlocks };
-      lastAttemptRef.current = { title, description, blocks: updatedBlocks };
+      lastSavedRef.current = { title, description, layoutMode, blocks: updatedBlocks };
+      lastAttemptRef.current = { title, description, layoutMode, blocks: updatedBlocks };
       lastAttemptHashRef.current = JSON.stringify(updatedBlocks);
       setSaveStatus('saved');
     } catch (error) {
       console.error('Save failed:', error);
       setSaveStatus('unsaved');
       // Prevent retry loop until user makes another change
-      lastAttemptRef.current = { title, description, blocks };
+      lastAttemptRef.current = { title, description, layoutMode, blocks };
       lastAttemptHashRef.current = JSON.stringify(blocks);
     } finally {
       setIsSaving(false);
@@ -381,7 +393,7 @@ export function PageEditor({
         isSavingSyncRef.current = false;
       }, 0);
     }
-  }, [title, description, blocks, page.slug, page.id, draftMode, page.published_page_id]);
+  }, [title, description, layoutMode, blocks, page.slug, page.id, draftMode, page.published_page_id]);
 
   // Trigger auto-save on changes
   useEffect(() => {
@@ -390,6 +402,7 @@ export function PageEditor({
     const hasChanges =
       title !== lastAttemptRef.current.title ||
       description !== lastAttemptRef.current.description ||
+      layoutMode !== lastAttemptRef.current.layoutMode ||
       blocksHash !== lastAttemptHashRef.current;
 
     if (hasChanges) {
@@ -400,7 +413,7 @@ export function PageEditor({
       }
       
       saveTimeoutRef.current = setTimeout(() => {
-        lastAttemptRef.current = { title, description, blocks };
+        lastAttemptRef.current = { title, description, layoutMode, blocks };
         lastAttemptHashRef.current = blocksHash;
         performSave();
       }, 1500); // Auto-save after 1.5 seconds of inactivity
@@ -411,7 +424,7 @@ export function PageEditor({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, description, blocksHash, performSave, readOnly]);
+  }, [title, description, layoutMode, blocksHash, performSave, readOnly]);
 
   // No aspect ratio tracking (simplified editor)
 
@@ -575,9 +588,9 @@ export function PageEditor({
         return { ...block, layout: { ...block.layout, h: nextH } };
       });
       if (!changed) return prev;
-      return resolveAllOverlaps(next);
+      return layoutMode === 'snap' ? resolveAllOverlaps(next) : next;
     });
-  }, [containerWidth, resolveAllOverlaps]);
+  }, [containerWidth, resolveAllOverlaps, layoutMode]);
 
   useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
@@ -616,9 +629,9 @@ export function PageEditor({
       });
 
       if (!changed) return prev;
-      return resolveAllOverlaps(next);
+      return layoutMode === 'snap' ? resolveAllOverlaps(next) : next;
     });
-  }, [measuredSizes, containerWidth, resolveAllOverlaps]);
+  }, [measuredSizes, containerWidth, resolveAllOverlaps, layoutMode]);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     const blockId = createBlockId('block');
@@ -666,8 +679,8 @@ export function PageEditor({
       }
 
       setBlocks([]);
-      lastSavedRef.current = { title, description, blocks: [] };
-      lastAttemptRef.current = { title, description, blocks: [] };
+      lastSavedRef.current = { title, description, layoutMode, blocks: [] };
+      lastAttemptRef.current = { title, description, layoutMode, blocks: [] };
       lastAttemptHashRef.current = JSON.stringify([]);
       setSaveStatus('saved');
     } catch (error) {
@@ -945,6 +958,32 @@ export function PageEditor({
               >
                 Clear Blocks
               </Button>
+              <div className="flex items-center gap-1 ml-2">
+                <Button
+                  onClick={() => setLayoutMode('snap')}
+                  variant="outline"
+                  size="sm"
+                  className={
+                    layoutMode === 'snap'
+                      ? 'bg-white text-black hover:bg-gray-100'
+                      : 'border-gray-600 text-white hover:bg-gray-800'
+                  }
+                >
+                  Snap Grid
+                </Button>
+                <Button
+                  onClick={() => setLayoutMode('free')}
+                  variant="outline"
+                  size="sm"
+                  className={
+                    layoutMode === 'free'
+                      ? 'bg-white text-black hover:bg-gray-100'
+                      : 'border-gray-600 text-white hover:bg-gray-800'
+                  }
+                >
+                  Free Grid
+                </Button>
+              </div>
               <div className="w-px h-6 bg-gray-700 mx-2" />
               <Link href={`/${page.slug}`} target="_blank">
                 <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-800">
@@ -1052,8 +1091,12 @@ export function PageEditor({
                   size={{ width: widthPx, height: heightPx }}
                   position={{ x: xPx, y: yPx }}
                   lockAspectRatio={ratio ?? false}
-                  dragGrid={[colWidth(containerWidth) + GRID_GAP, 1]}
-                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, 1]}
+                  dragGrid={
+                    layoutMode === 'snap' ? [colWidth(containerWidth) + GRID_GAP, 1] : undefined
+                  }
+                  resizeGrid={
+                    layoutMode === 'snap' ? [colWidth(containerWidth) + GRID_GAP, 1] : undefined
+                  }
                   minWidth={gridToPxW(1, containerWidth)}
                   maxWidth={gridToPxW(GRID_COLS, containerWidth)}
                   enableResizing={
@@ -1077,7 +1120,8 @@ export function PageEditor({
                     const nextX = clampGridX(nextXRaw, block.layout.w);
                     const effectiveH = getBlockHeightPx(block, block.layout.w);
                     const nextLayout = { x: nextX, y: nextY, w: block.layout.w, h: effectiveH };
-                    const resolvedLayout = resolveOverlap(block.id, nextLayout);
+                    const resolvedLayout =
+                      layoutMode === 'snap' ? resolveOverlap(block.id, nextLayout) : nextLayout;
 
                     setBlocks((prev) => {
                       const next = prev.map((b) =>
@@ -1085,7 +1129,7 @@ export function PageEditor({
                           ? { ...b, layout: { ...b.layout, x: resolvedLayout.x, y: resolvedLayout.y } }
                           : b
                       );
-                      return resolveAllOverlaps(next);
+                      return layoutMode === 'snap' ? resolveAllOverlaps(next) : next;
                     });
                   }}
                   onResizeStop={(_, __, ref, _delta, position) => {
@@ -1113,7 +1157,7 @@ export function PageEditor({
                             }
                           : b
                       );
-                      return resolveAllOverlaps(next);
+                      return layoutMode === 'snap' ? resolveAllOverlaps(next) : next;
                     });
                   }}
                 >

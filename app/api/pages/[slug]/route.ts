@@ -49,7 +49,7 @@ export async function PUT(
   }
 
   const body = await request.json();
-  const { title, description, published_page_id } = body;
+  const { title, description, published_page_id, layout_mode } = body;
 
   const { data, error } = await supabase
     .from(draftMode ? 'pages_drafts' : 'pages')
@@ -58,6 +58,7 @@ export async function PUT(
         slug,
         title,
         description,
+        layout_mode: layout_mode || 'snap',
         ...(draftMode ? { published_page_id: published_page_id || null } : {}),
       },
       { onConflict: 'slug' }

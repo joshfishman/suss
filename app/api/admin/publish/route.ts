@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     .update({
       title: draftPage.title,
       description: draftPage.description,
+      layout_mode: draftPage.layout_mode || 'snap',
     })
     .eq('id', livePageId);
 
