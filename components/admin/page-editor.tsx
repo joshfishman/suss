@@ -132,6 +132,7 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
   const handleSizesChange = useCallback(
     (sizes: Record<string, { width: number; height: number }>) => {
       if (sizesChanged(measuredSizes, sizes)) {
+        console.debug('[image-measurer] sizes', sizes);
         setMeasuredSizes(sizes);
       }
     },
@@ -156,6 +157,13 @@ export function PageEditor({ page, initialBlocks }: PageEditorProps) {
 
         const ratio = size.width / size.height;
         const newH = Math.max(1, Math.round(block.layout.w / ratio));
+        console.debug('[image-measurer] apply ratio', {
+          url: content.url,
+          ratio,
+          w: block.layout.w,
+          oldH: block.layout.h,
+          newH,
+        });
         if (block.layout.h !== newH) {
           changed = true;
           normalizedImageLayoutsRef.current.add(block.layout.i);
