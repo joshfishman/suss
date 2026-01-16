@@ -15,7 +15,26 @@ async function ensureDrafts(slug: string) {
     .single();
 
   if (!livePage) {
-    return { page: null, blocks: [] as ContentBlock[] };
+    const { data: draftPage } = await supabase
+      .from('pages_drafts')
+      .select('*')
+      .eq('slug', slug)
+      .single();
+
+    if (!draftPage) {
+      return { page: null, blocks: [] as ContentBlock[] };
+    }
+
+    const { data: draftBlocks } = await supabase
+      .from('content_blocks_drafts')
+      .select('*')
+      .eq('page_draft_id', draftPage.id)
+      .order('sort_order', { ascending: true });
+
+    return {
+      page: draftPage as DraftPage,
+      blocks: (draftBlocks || []) as ContentBlock[],
+    };
   }
 
   let { data: draftPage } = await supabase

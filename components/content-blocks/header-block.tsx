@@ -19,7 +19,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
             header: e.currentTarget.textContent || '',
           });
         }}
-        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-gray-800/60 rounded px-2 -mx-2"
+        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2"
         data-placeholder="Header"
       >
         {content.header || ''}
@@ -35,7 +35,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
               description: e.currentTarget.textContent || '',
             });
           }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-gray-800/60 rounded px-2 -mx-2"
+          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2"
           data-placeholder="Description"
         >
           {content.description}
@@ -51,7 +51,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
               description: e.currentTarget.textContent || '',
             });
           }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-gray-800/60 rounded px-2 -mx-2"
+          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2"
           data-placeholder="Description"
         >
           {content.description || ''}

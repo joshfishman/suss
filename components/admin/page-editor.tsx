@@ -1346,7 +1346,10 @@ export function PageEditor({
                       : Math.max(80, ref.offsetHeight);
                     const nextXRaw = pxToGridX(position.x, containerWidth);
                     let nextX = clampGridX(nextXRaw, nextW);
-                    if (position.x + nextWidthPx >= fullWidthPx - 1) {
+                    if (
+                      position.x + nextWidthPx >= fullWidthPx - 1 ||
+                      (nextX === 0 && nextW >= GRID_COLS - 1)
+                    ) {
                       nextW = GRID_COLS;
                       nextX = 0;
                     }

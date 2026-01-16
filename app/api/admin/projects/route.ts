@@ -67,5 +67,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  try {
+    const draftPayload = {
+      slug: data.slug,
+      title: data.title,
+      description: data.description || '',
+      hero_title: data.hero_title || data.title,
+      layout_mode: data.layout_mode || 'snap',
+      published_page_id: data.id,
+      page_type: data.page_type || 'project',
+    };
+    let { error: draftError } = await supabase
+      .from('pages_drafts')
+      .insert(draftPayload);
+    if (draftError && /(hero_title|layout_mode|page_type)/i.test(draftError.message)) {
+      const {
+        hero_title: _heroTitle,
+        layout_mode: _layoutMode,
+        page_type: _pageType,
+        ...fallbackPayload
+      } = draftPayload;
+      const fallback = await supabase.from('pages_drafts').insert(fallbackPayload);
+      draftError = fallback.error;
+    }
+    if (draftError) {
+      console.error('Failed to create project draft:', draftError);
+    }
+  } catch (error) {
+    console.error('Failed to create project draft:', error);
+  }
+
   return NextResponse.json({ id: data.id, slug: data.slug, title: data.title });
 }
