@@ -642,8 +642,15 @@ export function PageEditor({
         </button>
       )}
 
+      {/* Edit mode badge */}
+      {editOnPublic && (
+        <div className="fixed top-4 left-4 z-[80] bg-white text-black px-3 py-1 rounded-full text-xs font-medium shadow">
+          Edit Mode
+        </div>
+      )}
+
       {/* Admin toolbar - fixed top so it's always visible in edit mode */}
-      <div className={`fixed top-0 left-0 right-0 z-[70] bg-black text-white ${showEditControls ? '' : 'hidden'}`}>
+      <div className={`fixed top-0 left-0 right-0 z-[70] bg-black/95 backdrop-blur border-b border-white/10 text-white shadow ${showEditControls ? '' : 'hidden'}`}>
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
