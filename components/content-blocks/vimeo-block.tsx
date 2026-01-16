@@ -29,7 +29,7 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
   return (
     <div className="relative w-full aspect-video">
       <iframe
-        src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0`}
+        src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=1`}
         className="w-full h-full"
         frameBorder="0"
         allow="autoplay; fullscreen; picture-in-picture"
