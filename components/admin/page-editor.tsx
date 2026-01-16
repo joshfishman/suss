@@ -1015,7 +1015,7 @@ export function PageEditor({
             defaultWidth={400}
             defaultHeight={300}
           >
-            {({ sizes }) => (
+            {({ sizes }: { sizes: Record<string, { width: number; height: number }> }) => (
               <ImageSizeCollector sizes={sizes} onChange={handleSizesChange} />
             )}
           </ImageMeasurer>
