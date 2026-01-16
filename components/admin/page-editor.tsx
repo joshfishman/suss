@@ -1513,6 +1513,32 @@ export function PageEditor({
                               </Button>
                             </div>
                           </div>
+                        ) : block.block_type === 'text' ? (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end gap-2 pointer-events-none">
+                            <div className="flex gap-2 pointer-events-auto">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditBlock(block);
+                                }}
+                                className="bg-white text-black hover:bg-gray-100"
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBlock(block.id);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
                         ) : null}
                       </>
                     )}
