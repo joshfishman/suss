@@ -556,58 +556,42 @@ export function PageEditor({
     [getBlockHeightPx]
   );
 
-  const resolveOverlapsWithAnchor = useCallback(
-    (anchorId: string, nextBlocks: ContentBlock[]) => {
-      const anchor = nextBlocks.find((block) => block.id === anchorId);
-      if (!anchor) return nextBlocks;
-
-      const others = nextBlocks.filter((block) => block.id !== anchorId);
-      const sorted = [...others].sort((a, b) => {
+  const reflowLTR = useCallback(
+    (nextBlocks: ContentBlock[]) => {
+      const ordered = [...nextBlocks].sort((a, b) => {
         if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
         return a.layout.x - b.layout.x;
       });
 
-      const placed: ContentBlock[] = [anchor];
-      const resolvedById = new Map<string, ContentBlock>([[anchor.id, anchor]]);
+      const resolvedById = new Map<string, ContentBlock>();
+      let cursorX = 0;
+      let cursorY = 0;
+      let rowMaxH = 0;
       let changed = false;
 
-      for (const block of sorted) {
-        let candidate = { ...block, layout: { ...block.layout } };
-        let safety = 0;
-
-        const nextYAfterOverlap = (item: ContentBlock) => {
-          const itemH = getBlockHeightPx(item);
-          let maxBottom = item.layout.y;
-          let hasOverlap = false;
-          for (const other of placed) {
-            const otherH = getBlockHeightPx(other);
-            const overlapX =
-              item.layout.x < other.layout.x + other.layout.w &&
-              item.layout.x + item.layout.w > other.layout.x;
-            if (!overlapX) continue;
-            const overlapY =
-              item.layout.y < other.layout.y + otherH + GRID_GAP &&
-              item.layout.y + itemH + GRID_GAP > other.layout.y;
-            if (!overlapY) continue;
-            hasOverlap = true;
-            const bottom = other.layout.y + otherH + GRID_GAP;
-            if (bottom > maxBottom) maxBottom = bottom;
-          }
-          return hasOverlap ? maxBottom : null;
-        };
-
-        while (safety < 200) {
-          const nextY = nextYAfterOverlap(candidate);
-          if (nextY === null) break;
-          candidate = { ...candidate, layout: { ...candidate.layout, y: nextY } };
-          safety += 1;
+      for (const block of ordered) {
+        const blockH = getBlockHeightPx(block);
+        if (cursorX + block.layout.w > GRID_COLS) {
+          cursorY = cursorY + rowMaxH + GRID_GAP;
+          cursorX = 0;
+          rowMaxH = 0;
         }
 
-        if (candidate.layout.y !== block.layout.y) {
+        if (block.layout.x !== cursorX || block.layout.y !== cursorY) {
           changed = true;
         }
-        placed.push(candidate);
-        resolvedById.set(candidate.id, candidate);
+
+        const nextBlock = {
+          ...block,
+          layout: {
+            ...block.layout,
+            x: cursorX,
+            y: cursorY,
+          },
+        };
+        resolvedById.set(block.id, nextBlock);
+        cursorX += block.layout.w;
+        rowMaxH = Math.max(rowMaxH, blockH);
       }
 
       if (!changed) return nextBlocks;
@@ -621,23 +605,33 @@ export function PageEditor({
       if (existingBlocks.length === 0) {
         return { x: 0, y: 0 };
       }
-      const sorted = [...existingBlocks].sort((a, b) => {
-        if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
-        return a.layout.x - b.layout.x;
-      });
-      const last = sorted[sorted.length - 1];
-      const lastRowY = last.layout.y;
-      const rowBlocks = sorted.filter((block) => Math.abs(block.layout.y - lastRowY) < 1);
-      const rowBottom = Math.max(
-        ...rowBlocks.map((block) => block.layout.y + getBlockHeightPx(block))
-      );
-      const nextX = last.layout.x + last.layout.w;
-      if (nextX + blockW <= GRID_COLS) {
-        return { x: nextX, y: lastRowY };
+
+      const normalized =
+        layoutMode === 'snap' ? reflowLTR(existingBlocks) : existingBlocks;
+
+      const rows = new Map<number, { endX: number; maxH: number }>();
+      for (const block of normalized) {
+        const rowKey = block.layout.y;
+        const blockH = getBlockHeightPx(block);
+        const current = rows.get(rowKey) || { endX: 0, maxH: 0 };
+        rows.set(rowKey, {
+          endX: Math.max(current.endX, block.layout.x + block.layout.w),
+          maxH: Math.max(current.maxH, blockH),
+        });
       }
-      return { x: 0, y: rowBottom + GRID_GAP };
+
+      const rowEntries = [...rows.entries()].sort((a, b) => a[0] - b[0]);
+      for (const [rowY, info] of rowEntries) {
+        if (info.endX + blockW <= GRID_COLS) {
+          return { x: info.endX, y: rowY };
+        }
+      }
+
+      const lastRow = rowEntries[rowEntries.length - 1];
+      const nextY = lastRow ? lastRow[0] + lastRow[1].maxH + GRID_GAP : 0;
+      return { x: 0, y: nextY };
     },
-    [blocks, getBlockHeightPx]
+    [blocks, getBlockHeightPx, layoutMode, reflowLTR]
   );
 
   useEffect(() => {
@@ -651,9 +645,9 @@ export function PageEditor({
         return { ...block, layout: { ...block.layout, h: nextH } };
       });
       if (!changed) return prev;
-      return layoutMode === 'snap' ? resolveAllOverlaps(next) : next;
+      return layoutMode === 'snap' ? reflowLTR(next) : next;
     });
-  }, [containerWidth, resolveAllOverlaps, layoutMode]);
+  }, [containerWidth, layoutMode, reflowLTR]);
 
   useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
@@ -692,9 +686,9 @@ export function PageEditor({
       });
 
       if (!changed) return prev;
-      return layoutMode === 'snap' ? resolveAllOverlaps(next) : next;
+      return layoutMode === 'snap' ? reflowLTR(next) : next;
     });
-  }, [measuredSizes, containerWidth, resolveAllOverlaps, layoutMode]);
+  }, [measuredSizes, containerWidth, layoutMode, reflowLTR]);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     const blockId = createBlockId('block');
@@ -1192,9 +1186,7 @@ export function PageEditor({
                           ? { ...b, layout: { ...b.layout, x: resolvedLayout.x, y: resolvedLayout.y } }
                           : b
                       );
-                      return layoutMode === 'snap'
-                        ? resolveOverlapsWithAnchor(block.id, next)
-                        : next;
+                      return layoutMode === 'snap' ? reflowLTR(next) : next;
                     });
                   }}
                   onResizeStop={(_, __, ref, _delta, position) => {
@@ -1222,9 +1214,7 @@ export function PageEditor({
                             }
                           : b
                       );
-                      return layoutMode === 'snap'
-                        ? resolveOverlapsWithAnchor(block.id, next)
-                        : next;
+                      return layoutMode === 'snap' ? reflowLTR(next) : next;
                     });
                   }}
                 >
