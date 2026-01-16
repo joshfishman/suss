@@ -509,7 +509,10 @@ export function PageEditor({
       let changed = false;
 
       for (const block of sorted) {
-        let candidate = { ...block, layout: { ...block.layout } };
+        let candidate = {
+          ...block,
+          layout: { ...block.layout, y: 0 },
+        };
         let safety = 0;
         const nextYAfterOverlap = (item: ContentBlock) => {
           const itemH = getBlockHeightPx(item);

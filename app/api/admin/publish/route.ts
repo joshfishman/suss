@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing published_page_id' }, { status: 400 });
   }
 
-  const { error: pageUpdateError } = await supabase
+  let { error: pageUpdateError } = await supabase
     .from('pages')
     .update({
       title: draftPage.title,
@@ -39,6 +39,17 @@ export async function POST(request: Request) {
       layout_mode: draftPage.layout_mode || 'snap',
     })
     .eq('id', livePageId);
+
+  if (pageUpdateError && /layout_mode/i.test(pageUpdateError.message)) {
+    const fallback = await supabase
+      .from('pages')
+      .update({
+        title: draftPage.title,
+        description: draftPage.description,
+      })
+      .eq('id', livePageId);
+    pageUpdateError = fallback.error;
+  }
 
   if (pageUpdateError) {
     return NextResponse.json({ error: pageUpdateError.message }, { status: 500 });

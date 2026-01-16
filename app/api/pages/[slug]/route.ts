@@ -51,20 +51,30 @@ export async function PUT(
   const body = await request.json();
   const { title, description, published_page_id, layout_mode } = body;
 
-  const { data, error } = await supabase
+  const upsertPayload = {
+    slug,
+    title,
+    description,
+    layout_mode: layout_mode || 'snap',
+    ...(draftMode ? { published_page_id: published_page_id || null } : {}),
+  };
+
+  let { data, error } = await supabase
     .from(draftMode ? 'pages_drafts' : 'pages')
-    .upsert(
-      {
-        slug,
-        title,
-        description,
-        layout_mode: layout_mode || 'snap',
-        ...(draftMode ? { published_page_id: published_page_id || null } : {}),
-      },
-      { onConflict: 'slug' }
-    )
+    .upsert(upsertPayload, { onConflict: 'slug' })
     .select()
     .single();
+
+  if (error && /layout_mode/i.test(error.message)) {
+    const { layout_mode: _layoutMode, ...fallbackPayload } = upsertPayload;
+    const fallback = await supabase
+      .from(draftMode ? 'pages_drafts' : 'pages')
+      .upsert(fallbackPayload, { onConflict: 'slug' })
+      .select()
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
