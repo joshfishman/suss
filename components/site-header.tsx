@@ -67,7 +67,7 @@ export function SiteHeader() {
                 href="/projects"
                 className={cn(
                   'text-sm font-light tracking-wide uppercase transition-opacity hover:opacity-100 text-white',
-                  pathname === '/projects' || pathname.startsWith('/projects/')
+                  pathname === '/projects'
                     ? 'opacity-100'
                     : 'opacity-60'
                 )}
