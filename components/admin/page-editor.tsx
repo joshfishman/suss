@@ -540,6 +540,30 @@ export function PageEditor({
     [getBlockHeightPx]
   );
 
+  const getNextPlacement = useCallback(
+    (blockW: number, existingBlocks: ContentBlock[] = blocks) => {
+      if (existingBlocks.length === 0) {
+        return { x: 0, y: 0 };
+      }
+      const sorted = [...existingBlocks].sort((a, b) => {
+        if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
+        return a.layout.x - b.layout.x;
+      });
+      const last = sorted[sorted.length - 1];
+      const lastRowY = last.layout.y;
+      const rowBlocks = sorted.filter((block) => Math.abs(block.layout.y - lastRowY) < 1);
+      const rowBottom = Math.max(
+        ...rowBlocks.map((block) => block.layout.y + getBlockHeightPx(block))
+      );
+      const nextX = last.layout.x + last.layout.w;
+      if (nextX + blockW <= GRID_COLS) {
+        return { x: nextX, y: lastRowY };
+      }
+      return { x: 0, y: rowBottom + GRID_GAP };
+    },
+    [blocks, getBlockHeightPx]
+  );
+
   useEffect(() => {
     setBlocks((prev) => {
       let changed = false;
@@ -597,23 +621,13 @@ export function PageEditor({
   }, [measuredSizes, containerWidth, resolveAllOverlaps]);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
-    // Find first row (y=0) and calculate used width there
-    const firstRowBlocks = blocks.filter(b => b.layout.y === 0);
-    const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
-    
-    // If there's space in the first row, add there; otherwise start a new row
-    const nextX = usedWidth < GRID_COLS ? usedWidth : 0;
-    const maxBottomY = blocks.length
-      ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
-      : 0;
-    const nextY = usedWidth < GRID_COLS ? 0 : maxBottomY;
-
     const blockId = createBlockId('block');
     
     // Simple default sizing
     const blockW = 2;
     const blockH =
       type === 'vimeo' ? ratioToPxH(blockW, 16 / 9, containerWidth) : ratioToPxH(blockW, 1, containerWidth);
+    const { x: nextX, y: nextY } = getNextPlacement(blockW);
 
     const newBlock: ContentBlock = {
       id: createBlockId('temp'),
@@ -634,7 +648,7 @@ export function PageEditor({
       updated_at: new Date().toISOString(),
     };
     setBlocks((prev) => [...prev, newBlock]);
-  }, [page.id, blocks, containerWidth]);
+  }, [page.id, containerWidth, getNextPlacement]);
 
   const handleDeleteBlock = useCallback((blockId: string) => {
     setBlocks((prev) => prev.filter((b) => b.id !== blockId));
@@ -804,12 +818,7 @@ export function PageEditor({
           
           // Calculate position: place side by side on first row (y=0)
           const allBlocks = [...blocks, ...newBlocks];
-          const firstRowBlocks = allBlocks.filter(b => b.layout.y === 0);
-          const usedWidth = firstRowBlocks.reduce((sum, b) => sum + b.layout.w, 0);
-          
-          // If there's space in first row, add there; otherwise start new row
-          const nextX = usedWidth + blockW <= GRID_COLS ? usedWidth : 0;
-          const nextY = usedWidth + blockW <= GRID_COLS ? 0 : (allBlocks.length > 0 ? Math.max(...allBlocks.map(b => b.layout.y + b.layout.h)) : 0);
+          const { x: nextX, y: nextY } = getNextPlacement(blockW, allBlocks);
           
           const blockId = createBlockId('block');
           
@@ -840,7 +849,7 @@ export function PageEditor({
     if (newBlocks.length > 0) {
       setBlocks((prev) => [...prev, ...newBlocks]);
     }
-  }, [blocks, page.id, containerWidth]);
+  }, [blocks, page.id, containerWidth, getNextPlacement]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
