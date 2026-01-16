@@ -3,9 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
-import GridLayout, { Layout, LayoutItem } from 'react-grid-layout';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
+import { Rnd } from 'react-rnd';
 import { Page, ContentBlock } from '@/lib/types/content';
 import { BlockRenderer } from '@/components/content-blocks/block-renderer';
 import { BlockEditorModal } from './block-editor-modal';
@@ -60,6 +58,38 @@ function sizesChanged(
     }
   }
   return false;
+}
+
+const GRID_COLS = 4;
+const GRID_GAP = 16;
+const GRID_ROW = 20;
+
+function colWidth(containerWidth: number) {
+  return (containerWidth - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+}
+
+function gridToPxX(x: number, containerWidth: number) {
+  return x * colWidth(containerWidth) + x * GRID_GAP;
+}
+
+function gridToPxW(w: number, containerWidth: number) {
+  return w * colWidth(containerWidth) + (w - 1) * GRID_GAP;
+}
+
+function pxToGridX(px: number, containerWidth: number) {
+  return Math.max(0, Math.min(GRID_COLS - 1, Math.round(px / (colWidth(containerWidth) + GRID_GAP))));
+}
+
+function pxToGridW(px: number, containerWidth: number) {
+  return Math.max(1, Math.min(GRID_COLS, Math.round((px + GRID_GAP) / (colWidth(containerWidth) + GRID_GAP))));
+}
+
+function gridToPxY(y: number) {
+  return y * GRID_ROW;
+}
+
+function pxToGridY(px: number) {
+  return Math.max(0, Math.round(px / GRID_ROW));
 }
 
 function normalizeInitialBlocks(blocks: ContentBlock[]) {
@@ -120,6 +150,7 @@ export function PageEditor({
   const normalizedImageLayoutsRef = useRef(new Set<string>());
   const [measuredSizes, setMeasuredSizes] = useState<Record<string, { width: number; height: number }>>({});
   const lastImageUrlByLayoutRef = useRef<Record<string, string>>({});
+  const imageRatioRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const updateWidth = () => {
@@ -173,6 +204,7 @@ export function PageEditor({
         }
 
         const ratio = size.width / size.height;
+        imageRatioRef.current[block.layout.i] = ratio;
         const newH = Math.max(1, Math.round(block.layout.w / ratio));
         console.log('[image-measurer] apply ratio', {
           url: content.url,
@@ -330,85 +362,19 @@ export function PageEditor({
 
   // No aspect ratio tracking (simplified editor)
 
-  const layout = blocks.map((block) => ({
-    i: block.layout.i,
-    x: block.layout.x,
-    y: block.layout.y,
-    w: block.layout.w,
-    h: block.layout.h,
-    minW: 1,
-    maxW: 4,
-    minH: 1,
-  }));
-
-  const handleLayoutChange = useCallback((newLayout: Layout) => {
-    setBlocks((prevBlocks) =>
-      prevBlocks.map((block) => {
-        const layoutItem = newLayout.find((l: LayoutItem) => l.i === block.layout.i);
-        if (layoutItem) {
-          return {
-            ...block,
-            layout: {
-              ...block.layout,
-              x: layoutItem.x,
-              y: layoutItem.y,
-              w: layoutItem.w,
-              h: layoutItem.h,
-            },
-          };
-        }
-        return block;
-      })
-    );
-  }, []);
-
   const getRatioForBlock = useCallback((block: ContentBlock) => {
     if (block.block_type === 'vimeo') {
       return 16 / 9;
     }
     if (block.block_type === 'image') {
       const content = block.content as { url?: string };
-      if (!content?.url) return null;
+      if (!content?.url) return imageRatioRef.current[block.layout.i] || 1;
       const size = measuredSizes[content.url];
-      if (!size) return null;
+      if (!size) return imageRatioRef.current[block.layout.i] || 1;
       return size.width / size.height;
     }
     return null;
   }, [measuredSizes]);
-
-  const handleResize = useCallback((
-    layout: Layout,
-    oldItem: LayoutItem | null,
-    newItem: LayoutItem | null,
-    placeholder: LayoutItem | null
-  ) => {
-    if (!newItem) return;
-    const block = blocks.find((b) => b.layout.i === newItem.i);
-    if (!block) return;
-    const ratio = getRatioForBlock(block);
-    if (!ratio) return;
-
-    const widthChanged = !oldItem || newItem.w !== oldItem.w;
-    const heightChanged = !oldItem || newItem.h !== oldItem.h;
-
-    if (widthChanged) {
-      const newHeight = Math.max(1, Math.round(newItem.w / ratio));
-      newItem.h = newHeight;
-      if (placeholder) placeholder.h = newHeight;
-    } else if (heightChanged) {
-      const newWidth = Math.max(1, Math.round(newItem.h * ratio));
-      newItem.w = newWidth;
-      if (placeholder) placeholder.w = newWidth;
-    }
-  }, [blocks, getRatioForBlock]);
-
-  const handleResizeStop = useCallback((
-    layout: Layout,
-    oldItem: LayoutItem | null,
-    newItem: LayoutItem | null
-  ) => {
-    // Keep ratios locked; no updates needed here
-  }, []);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     // Find first row (y=0) and calculate used width there
@@ -417,13 +383,13 @@ export function PageEditor({
     
     // If there's space in the first row, add there; otherwise start a new row
     const nextX = usedWidth < 4 ? usedWidth : 0;
-    const nextY = usedWidth < 4 ? 0 : (blocks.length > 0 ? Math.max(...blocks.map(b => b.layout.y + b.layout.h)) : 0);
+    const nextY = usedWidth < 4 ? 0 : (blocks.length > 0 ? Math.max(...blocks.map(b => b.layout.y + 1)) : 0);
 
     const blockId = createBlockId('block');
     
     // Simple default sizing
     const blockW = 2;
-    const blockH = 3;
+    const blockH = 1;
 
     const newBlock: ContentBlock = {
       id: createBlockId('temp'),
@@ -608,7 +574,7 @@ export function PageEditor({
           
           // Simple default size for dropped images
           const blockW = 2;
-          const blockH = 3;
+          const blockH = 1;
           
           // Calculate position: place side by side on first row (y=0)
           const allBlocks = [...blocks, ...newBlocks];
@@ -830,122 +796,150 @@ export function PageEditor({
             </div>
           </div>
         ) : (
-          <GridLayout
-            className="layout"
-            layout={layout}
-            width={containerWidth}
-            onLayoutChange={handleLayoutChange}
-            onResize={handleResize}
-            onResizeStop={handleResizeStop}
-            gridConfig={{
-              cols: 4,
-              rowHeight: 100,
-              margin: [16, 16] as const,
-              containerPadding: [0, 0] as const,
-            }}
-            dragConfig={{ enabled: true }}
-            resizeConfig={{ enabled: true }}
-          >
-            {blocks.map((block) => (
-              <div
-                key={block.layout.i}
-                className="relative rounded-lg overflow-hidden bg-gray-100 group"
-                onDragOver={(event) => {
-                  if (block.block_type === 'image') {
-                    event.preventDefault();
-                  }
-                }}
-                onDrop={(event) => {
-                  if (block.block_type !== 'image') return;
-                  event.preventDefault();
-                  const file = event.dataTransfer?.files?.[0];
-                  if (file) {
-                    handleUploadToBlock(block, file);
-                  }
-                }}
-              >
-                <BlockRenderer block={block} isEditing />
-                {showEditControls && (
-                  <>
-                    {block.block_type === 'vimeo' ? (
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2">
-                        <input
-                          type="text"
-                          placeholder="Vimeo ID"
-                          value={(block.content as any)?.vimeo_id || ''}
-                          onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
-                          className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Title"
-                          value={(block.content as any)?.title || ''}
-                          onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
-                          className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Caption"
-                          value={(block.content as any)?.caption || ''}
-                          onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
-                          className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                        />
-                        <div className="flex justify-end gap-2 pt-1">
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteBlock(block.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100">
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUploadButton(block);
-                            }}
-                            className="bg-white text-black hover:bg-gray-100"
-                          >
-                            Upload
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectExisting(block);
-                            }}
-                            className="bg-white text-black hover:bg-gray-100"
-                          >
-                            Existing
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteBlock(block.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
+          <div className="relative w-full min-h-[400px]">
+            {blocks.map((block) => {
+              const ratio = getRatioForBlock(block);
+              const widthPx = gridToPxW(block.layout.w, containerWidth);
+              const heightPx = ratio ? widthPx / ratio : gridToPxW(1, containerWidth);
+              const xPx = gridToPxX(block.layout.x, containerWidth);
+              const yPx = gridToPxY(block.layout.y);
+
+              return (
+                <Rnd
+                  key={block.layout.i}
+                  bounds="parent"
+                  size={{ width: widthPx, height: heightPx }}
+                  position={{ x: xPx, y: yPx }}
+                  lockAspectRatio={ratio ?? false}
+                  dragGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW]}
+                  resizeGrid={[colWidth(containerWidth) + GRID_GAP, GRID_ROW]}
+                  enableResizing={showEditControls}
+                  disableDragging={!showEditControls}
+                  onDragStop={(_, data) => {
+                    const nextX = pxToGridX(data.x, containerWidth);
+                    const nextY = pxToGridY(data.y);
+                    setBlocks((prev) =>
+                      prev.map((b) =>
+                        b.id === block.id
+                          ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
+                          : b
+                      )
+                    );
+                  }}
+                  onResizeStop={(_, __, ___, delta, position) => {
+                    const nextW = pxToGridW(widthPx + delta.width, containerWidth);
+                    const nextX = pxToGridX(position.x, containerWidth);
+                    const nextY = pxToGridY(position.y);
+                    const nextH = ratio ? Math.max(1, Math.round(nextW / ratio)) : block.layout.h;
+                    setBlocks((prev) =>
+                      prev.map((b) =>
+                        b.id === block.id
+                          ? { ...b, layout: { ...b.layout, w: nextW, h: nextH, x: nextX, y: nextY } }
+                          : b
+                      )
+                    );
+                  }}
+                >
+                  <div
+                    className="relative rounded-lg overflow-hidden bg-gray-100 group w-full h-full"
+                    onDragOver={(event) => {
+                      if (block.block_type === 'image') {
+                        event.preventDefault();
+                      }
+                    }}
+                    onDrop={(event) => {
+                      if (block.block_type !== 'image') return;
+                      event.preventDefault();
+                      const file = event.dataTransfer?.files?.[0];
+                      if (file) {
+                        handleUploadToBlock(block, file);
+                      }
+                    }}
+                  >
+                    <BlockRenderer block={block} isEditing />
+                    {showEditControls && (
+                      <>
+                        {block.block_type === 'vimeo' ? (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2">
+                            <input
+                              type="text"
+                              placeholder="Vimeo ID"
+                              value={(block.content as any)?.vimeo_id || ''}
+                              onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
+                              className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Title"
+                              value={(block.content as any)?.title || ''}
+                              onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
+                              className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Caption"
+                              value={(block.content as any)?.caption || ''}
+                              onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
+                              className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                            />
+                            <div className="flex justify-end gap-2 pt-1">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBlock(block.id);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 bg-black/30 transition-colors flex items-center justify-center opacity-100">
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUploadButton(block);
+                                }}
+                                className="bg-white text-black hover:bg-gray-100"
+                              >
+                                Upload
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectExisting(block);
+                                }}
+                                className="bg-white text-black hover:bg-gray-100"
+                              >
+                                Existing
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBlock(block.id);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-              </div>
-            ))}
-          </GridLayout>
+                  </div>
+                </Rnd>
+              );
+            })}
+          </div>
         )}
         </div>
       </main>
