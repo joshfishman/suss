@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     slug,
     title,
     description: '',
+    hero_title: title,
     layout_mode: 'snap',
     page_type: 'project',
   };
@@ -45,8 +46,13 @@ export async function POST(request: Request) {
 
   if (error) {
     // Fallback in case new columns don't exist yet
-    if (/(layout_mode|page_type)/i.test(error.message)) {
-      const { layout_mode: _layoutMode, page_type: _pageType, ...fallbackPayload } = insertPayload;
+    if (/(layout_mode|page_type|hero_title)/i.test(error.message)) {
+      const {
+        layout_mode: _layoutMode,
+        page_type: _pageType,
+        hero_title: _heroTitle,
+        ...fallbackPayload
+      } = insertPayload;
       const fallback = await supabase
         .from('pages')
         .insert(fallbackPayload)

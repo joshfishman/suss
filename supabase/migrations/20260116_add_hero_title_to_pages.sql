@@ -1,0 +1,5 @@
+ALTER TABLE pages
+ADD COLUMN IF NOT EXISTS hero_title TEXT;
+
+ALTER TABLE pages_drafts
+ADD COLUMN IF NOT EXISTS hero_title TEXT;

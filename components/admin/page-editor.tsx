@@ -20,6 +20,7 @@ import {
 import { BlockRenderer } from '@/components/content-blocks/block-renderer';
 import { BlockEditorModal } from './block-editor-modal';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ArrowLeft, Trash2, Edit, Video, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { SiteHeader } from '@/components/site-header';
@@ -113,6 +114,7 @@ export function PageEditor({
   const router = useRouter();
   const [blocks, setBlocks] = useState<ContentBlock[]>(() => normalizeInitialBlocks(initialBlocks));
   const [title, setTitle] = useState(page.title);
+  const [heroTitle, setHeroTitle] = useState(page.hero_title || page.title);
   const [description, setDescription] = useState(page.description || '');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
@@ -134,12 +136,14 @@ export function PageEditor({
   const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef({
     title: page.title,
+    heroTitle: page.hero_title || page.title,
     description: page.description || '',
     layoutMode: page.layout_mode || 'snap',
     blocks: initialBlocks,
   });
   const lastAttemptRef = useRef({
     title: page.title,
+    heroTitle: page.hero_title || page.title,
     description: page.description || '',
     layoutMode: page.layout_mode || 'snap',
     blocks: initialBlocks,
@@ -286,6 +290,7 @@ export function PageEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
+          hero_title: heroTitle,
           description,
           layout_mode: layoutMode,
           published_page_id: page.published_page_id || null,
@@ -399,15 +404,15 @@ export function PageEditor({
         setBlocks(updatedBlocks);
       }
 
-      lastSavedRef.current = { title, description, layoutMode, blocks: updatedBlocks };
-      lastAttemptRef.current = { title, description, layoutMode, blocks: updatedBlocks };
+      lastSavedRef.current = { title, heroTitle, description, layoutMode, blocks: updatedBlocks };
+      lastAttemptRef.current = { title, heroTitle, description, layoutMode, blocks: updatedBlocks };
       lastAttemptHashRef.current = JSON.stringify(updatedBlocks);
       setSaveStatus('saved');
     } catch (error) {
       console.error('Save failed:', error);
       setSaveStatus('unsaved');
       // Prevent retry loop until user makes another change
-      lastAttemptRef.current = { title, description, layoutMode, blocks };
+      lastAttemptRef.current = { title, heroTitle, description, layoutMode, blocks };
       lastAttemptHashRef.current = JSON.stringify(blocks);
     } finally {
       setIsSaving(false);
@@ -416,7 +421,7 @@ export function PageEditor({
         isSavingSyncRef.current = false;
       }, 0);
     }
-  }, [title, description, layoutMode, blocks, page.slug, page.id, draftMode, page.published_page_id]);
+  }, [title, heroTitle, description, layoutMode, blocks, page.slug, page.id, draftMode, page.published_page_id]);
 
   // Trigger auto-save on changes
   useEffect(() => {
@@ -424,6 +429,7 @@ export function PageEditor({
     if (isSavingSyncRef.current) return;
     const hasChanges =
       title !== lastAttemptRef.current.title ||
+      heroTitle !== lastAttemptRef.current.heroTitle ||
       description !== lastAttemptRef.current.description ||
       layoutMode !== lastAttemptRef.current.layoutMode ||
       blocksHash !== lastAttemptHashRef.current;
@@ -436,7 +442,7 @@ export function PageEditor({
       }
       
       saveTimeoutRef.current = setTimeout(() => {
-        lastAttemptRef.current = { title, description, layoutMode, blocks };
+        lastAttemptRef.current = { title, heroTitle, description, layoutMode, blocks };
         lastAttemptHashRef.current = blocksHash;
         performSave();
       }, 1500); // Auto-save after 1.5 seconds of inactivity
@@ -447,7 +453,7 @@ export function PageEditor({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, description, layoutMode, blocksHash, performSave, readOnly]);
+  }, [title, heroTitle, description, layoutMode, blocksHash, performSave, readOnly]);
 
   // No aspect ratio tracking (simplified editor)
 
@@ -767,8 +773,8 @@ export function PageEditor({
       }
 
       setBlocks([]);
-      lastSavedRef.current = { title, description, layoutMode, blocks: [] };
-      lastAttemptRef.current = { title, description, layoutMode, blocks: [] };
+      lastSavedRef.current = { title, heroTitle, description, layoutMode, blocks: [] };
+      lastAttemptRef.current = { title, heroTitle, description, layoutMode, blocks: [] };
       lastAttemptHashRef.current = JSON.stringify([]);
       setSaveStatus('saved');
     } catch (error) {
@@ -1025,7 +1031,14 @@ export function PageEditor({
                   {editOnPublic ? 'Exit' : 'Back'}
                 </Button>
               </Link>
-              <span className="text-sm text-gray-400">Editing: {page.title}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">Page Title</span>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="h-8 w-48 bg-black border-white/20 text-white text-sm"
+                />
+              </div>
             </div>
             
             <div className="flex items-center gap-2">
@@ -1139,7 +1152,7 @@ export function PageEditor({
               ref={titleRef}
               contentEditable
               suppressContentEditableWarning
-              onBlur={(e) => setTitle(e.currentTarget.textContent || '')}
+              onBlur={(e) => setHeroTitle(e.currentTarget.textContent || '')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -1149,7 +1162,7 @@ export function PageEditor({
               className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text"
               data-placeholder="Page Title"
             >
-              {title}
+              {heroTitle}
             </h1>
             <p
               ref={descriptionRef}

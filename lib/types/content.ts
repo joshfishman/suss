@@ -41,6 +41,7 @@ export interface Page {
   slug: string;
   title: string;
   description?: string;
+  hero_title?: string;
   layout_mode?: LayoutMode;
   page_type?: PageType;
   created_at: string;

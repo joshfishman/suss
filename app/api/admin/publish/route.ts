@@ -36,12 +36,13 @@ export async function POST(request: Request) {
     .update({
       title: draftPage.title,
       description: draftPage.description,
+      hero_title: draftPage.hero_title || draftPage.title,
       layout_mode: draftPage.layout_mode || 'snap',
       page_type: draftPage.page_type || 'page',
     })
     .eq('id', livePageId);
 
-  if (pageUpdateError && /(layout_mode|page_type)/i.test(pageUpdateError.message)) {
+  if (pageUpdateError && /(layout_mode|page_type|hero_title)/i.test(pageUpdateError.message)) {
     const fallback = await supabase
       .from('pages')
       .update({

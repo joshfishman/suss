@@ -31,6 +31,7 @@ async function ensureDrafts(slug: string) {
         slug: livePage.slug,
         title: livePage.title,
         description: livePage.description,
+        hero_title: livePage.hero_title || livePage.title,
         layout_mode: livePage.layout_mode || 'snap',
         published_page_id: livePage.id,
         page_type: livePage.page_type || 'page',
