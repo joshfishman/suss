@@ -4,11 +4,20 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const supabase = await createClient();
 
-  const { data: pages, error: pagesError } = await supabase
+  let { data: pages, error: pagesError } = await supabase
     .from('pages')
     .select('*')
     .eq('page_type', 'project')
     .order('created_at', { ascending: false });
+
+  if (pagesError && /page_type/i.test(pagesError.message)) {
+    const fallback = await supabase
+      .from('pages')
+      .select('*')
+      .order('created_at', { ascending: false });
+    pages = fallback.data || [];
+    pagesError = fallback.error;
+  }
 
   if (pagesError) {
     return NextResponse.json({ error: pagesError.message }, { status: 500 });
@@ -18,7 +27,9 @@ export async function GET() {
     return NextResponse.json({ projects: [] });
   }
 
-  const pageIds = pages.map((page) => page.id);
+  const filteredPages = pages.filter((page) => page.page_type === 'project' || page.slug?.startsWith('project-'));
+
+  const pageIds = filteredPages.map((page) => page.id);
   const { data: blocks, error: blocksError } = await supabase
     .from('content_blocks')
     .select('*')
@@ -36,7 +47,7 @@ export async function GET() {
     }
   }
 
-  const projects = pages.map((page) => ({
+  const projects = filteredPages.map((page) => ({
     id: page.id,
     slug: page.slug,
     title: page.title,
