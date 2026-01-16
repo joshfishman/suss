@@ -22,7 +22,8 @@ export function TextBlock({ content, isEditing = false }: TextBlockProps) {
   return (
     <div className="relative w-full h-full flex items-center justify-center p-4">
       <div
-        className={getClassName()}
+        dir="ltr"
+        className={`${getClassName()} text-left`}
         dangerouslySetInnerHTML={{ __html: content.html }}
       />
       {isEditing && (

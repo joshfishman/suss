@@ -101,6 +101,7 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
         className={`absolute inset-0 z-10 flex items-center justify-center bg-black/30 text-white transition-opacity ${
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
+        style={{ pointerEvents: showControls ? 'auto' : 'none' }}
       >
         {isPlaying ? <Pause className="w-10 h-10" /> : <Play className="w-10 h-10" />}
       </button>

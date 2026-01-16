@@ -1559,20 +1559,36 @@ export function PageEditor({
               <p className="text-white/60 text-sm">No projects yet.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {projectPreviews.map((project) => (
-                  <Link key={project.id} href={`/${project.slug}`} className="group">
-                    <div className="mb-3 text-lg font-light">{project.title}</div>
-                    {project.first_block ? (
-                      <div className="rounded-lg overflow-hidden bg-black">
-                        <BlockRenderer block={project.first_block} />
-                      </div>
-                    ) : (
-                      <div className="rounded-lg bg-white/5 text-white/60 text-sm p-6">
-                        No preview yet
-                      </div>
-                    )}
-                  </Link>
-                ))}
+                {projectPreviews.map((project) => {
+                  const firstBlock = project.first_block;
+                  const isVimeo = firstBlock?.block_type === 'vimeo';
+
+                  return (
+                    <div key={project.id} className="group">
+                      <Link
+                        href={`/${project.slug}`}
+                        className="mb-3 text-lg font-light inline-flex text-white hover:text-white/90"
+                      >
+                        {project.title}
+                      </Link>
+                      {firstBlock ? (
+                        isVimeo ? (
+                          <div className="rounded-lg overflow-hidden bg-black">
+                            <BlockRenderer block={firstBlock} />
+                          </div>
+                        ) : (
+                          <Link href={`/${project.slug}`} className="block rounded-lg overflow-hidden bg-black">
+                            <BlockRenderer block={firstBlock} />
+                          </Link>
+                        )
+                      ) : (
+                        <div className="rounded-lg bg-white/5 text-white/60 text-sm p-6">
+                          No preview yet
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
