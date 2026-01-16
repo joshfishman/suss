@@ -106,8 +106,11 @@ export function PageEditor({
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [showEditControls, setShowEditControls] = useState(false);
+  const [showEditControls, setShowEditControls] = useState(editOnPublic);
+  const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
+  const [editorInitialTab, setEditorInitialTab] = useState<'upload' | 'existing'>('upload');
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -450,7 +453,47 @@ export function PageEditor({
   }, [title, description, draftMode]);
 
   const handleEditBlock = useCallback((block: ContentBlock) => {
+    setEditorInitialTab('upload');
     setEditingBlock(block);
+  }, []);
+
+  const handleSelectExisting = useCallback((block: ContentBlock) => {
+    setEditorInitialTab('existing');
+    setEditingBlock(block);
+  }, []);
+
+  const handleUploadToBlock = useCallback(async (block: ContentBlock, file: File) => {
+    if (block.block_type !== 'image') return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const content = block.content as { url?: string; alt?: string; caption?: string };
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === block.id
+            ? { ...b, content: { ...content, url: data.url } }
+            : b
+        )
+      );
+    } catch (error) {
+      console.error('Upload failed:', error);
+    }
+  }, []);
+
+  const handleUploadButton = useCallback((block: ContentBlock) => {
+    setActiveUploadBlockId(block.id);
+    setEditorInitialTab('upload');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
   }, []);
 
   const handleSaveBlock = useCallback((updatedBlock: ContentBlock) => {
@@ -458,6 +501,14 @@ export function PageEditor({
       prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b))
     );
   }, []);
+
+  const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeUploadBlockId) return;
+    const block = blocks.find((b) => b.id === activeUploadBlockId);
+    if (!block) return;
+    handleUploadToBlock(block, file);
+  }, [activeUploadBlockId, blocks, handleUploadToBlock]);
 
   const handlePublish = useCallback(async () => {
     if (!draftMode) return;
@@ -562,6 +613,13 @@ export function PageEditor({
   return (
     <div className="min-h-screen bg-black text-white flex flex-col" {...getRootProps()}>
       <input {...getInputProps()} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
       
       {/* Drag overlay */}
       {isDragActive && (
@@ -736,22 +794,62 @@ export function PageEditor({
               <div
                 key={block.layout.i}
                 className="relative rounded-lg overflow-hidden bg-gray-100 group"
+                onDragOver={(event) => {
+                  if (block.block_type === 'image') {
+                    event.preventDefault();
+                  }
+                }}
+                onDrop={(event) => {
+                  if (block.block_type !== 'image') return;
+                  event.preventDefault();
+                  const file = event.dataTransfer?.files?.[0];
+                  if (file) {
+                    handleUploadToBlock(block, file);
+                  }
+                }}
               >
                 <BlockRenderer block={block} isEditing />
                 {(showEditControls || !editOnPublic) && (
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditBlock(block);
-                        }}
-                        className="bg-white text-black hover:bg-gray-100"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
+                      {block.block_type === 'image' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUploadButton(block);
+                            }}
+                            className="bg-white text-black hover:bg-gray-100"
+                          >
+                            Upload
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectExisting(block);
+                            }}
+                            className="bg-white text-black hover:bg-gray-100"
+                          >
+                            Existing
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditBlock(block);
+                          }}
+                          className="bg-white text-black hover:bg-gray-100"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="destructive"
@@ -796,6 +894,7 @@ export function PageEditor({
           block={editingBlock}
           onSave={handleSaveBlock}
           onClose={() => setEditingBlock(null)}
+          initialTab={editorInitialTab}
         />
       )}
     </div>

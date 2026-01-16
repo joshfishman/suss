@@ -12,12 +12,13 @@ interface BlockEditorModalProps {
   block: ContentBlock;
   onSave: (block: ContentBlock) => void;
   onClose: () => void;
+  initialTab?: 'upload' | 'existing';
 }
 
-export function BlockEditorModal({ block, onSave, onClose }: BlockEditorModalProps) {
+export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload' }: BlockEditorModalProps) {
   const [content, setContent] = useState(block.content);
   const [uploading, setUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'upload' | 'existing'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'existing'>(initialTab);
   const [existingImages, setExistingImages] = useState<{ url: string; name: string }[]>([]);
   const [loadingImages, setLoadingImages] = useState(false);
 
