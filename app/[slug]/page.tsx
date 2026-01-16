@@ -16,7 +16,14 @@ async function PageContent({ slug, editMode }: { slug: string; editMode: boolean
 
   const { page, blocks } = await getPageData(slug, editMode);
 
-  if (!page || page.page_type !== 'project') {
+  const isReserved = ['home', 'about', 'projects'].includes(slug);
+  const isProject =
+    page &&
+    (page.page_type === 'project' ||
+      (!page.page_type && !isReserved) ||
+      page.slug?.startsWith('project-'));
+
+  if (!isProject) {
     return <div>Page not found</div>;
   }
 
