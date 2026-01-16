@@ -1,4 +1,4 @@
-export type BlockType = 'image' | 'vimeo' | 'text';
+export type BlockType = 'image' | 'vimeo' | 'text' | 'header';
 export type LayoutMode = 'snap' | 'free';
 export type PageType = 'page' | 'project';
 
@@ -6,7 +6,7 @@ export interface ContentBlock {
   id: string;
   page_id: string;
   block_type: BlockType;
-  content: ImageContent | VimeoContent | TextContent;
+  content: ImageContent | VimeoContent | TextContent | HeaderContent;
   layout: {
     x: number;
     y: number;
@@ -34,6 +34,11 @@ export interface VimeoContent {
 export interface TextContent {
   html: string;
   style?: 'heading' | 'paragraph' | 'caption';
+}
+
+export interface HeaderContent {
+  header: string;
+  description: string;
 }
 
 export interface Page {

@@ -21,7 +21,13 @@ import { BlockRenderer } from '@/components/content-blocks/block-renderer';
 import { BlockEditorModal } from './block-editor-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Trash2, Edit, Video, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ArrowLeft, Trash2, Edit, Video, Image as ImageIcon, Check, Loader2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
@@ -727,7 +733,7 @@ export function PageEditor({
     });
   }, [measuredSizes, containerWidth, layoutMode, packMasonry]);
 
-  const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
+  const handleAddBlock = useCallback((type: ContentBlock['block_type']) => {
     const blockId = createBlockId('block');
     
     // Simple default sizing
@@ -740,9 +746,14 @@ export function PageEditor({
       id: createBlockId('temp'),
       page_id: page.id,
       block_type: type,
-      content: type === 'image' 
-        ? { url: '', alt: '', caption: '' }
-        : { vimeo_id: '', title: '', caption: '' },
+      content:
+        type === 'image'
+          ? { url: '', alt: '', caption: '' }
+          : type === 'vimeo'
+            ? { vimeo_id: '', title: '', caption: '' }
+            : type === 'text'
+              ? { html: '', style: 'paragraph' }
+              : { header: '', description: '' },
       layout: {
         i: blockId,
         x: nextX,
@@ -1042,24 +1053,32 @@ export function PageEditor({
             </div>
             
             <div className="flex items-center gap-2">
-              <Button
-                onClick={() => handleAddBlock('image')}
-                variant="outline"
-                size="sm"
-                className="border-gray-600 text-white hover:bg-gray-800"
-              >
-                <ImageIcon className="w-4 h-4 mr-2" />
-                Image
-              </Button>
-              <Button
-                onClick={() => handleAddBlock('vimeo')}
-                variant="outline"
-                size="sm"
-                className="border-gray-600 text-white hover:bg-gray-800"
-              >
-                <Video className="w-4 h-4 mr-2" />
-                Vimeo
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-gray-600 text-white hover:bg-gray-800"
+                  >
+                    Blocks
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-black text-white border-white/10">
+                  <DropdownMenuItem onClick={() => handleAddBlock('header')}>
+                    Header & Description
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAddBlock('image')}>
+                    Image
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAddBlock('vimeo')}>
+                    Vimeo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAddBlock('text')}>
+                    Text
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 onClick={handleCreateProject}
                 variant="outline"
@@ -1347,7 +1366,7 @@ export function PageEditor({
                               </Button>
                             </div>
                           </div>
-                        ) : (
+                        ) : block.block_type === 'image' ? (
                           <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex flex-col gap-2 pointer-events-none">
                             <div className="flex gap-2 pointer-events-auto justify-end">
                               <Button
@@ -1409,7 +1428,56 @@ export function PageEditor({
                               />
                             </div>
                           </div>
-                        )}
+                        ) : block.block_type === 'header' ? (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex flex-col gap-2 pointer-events-none">
+                            <div className="flex gap-2 pointer-events-auto justify-end">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBlock(block.id);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <div className="flex flex-col gap-2 pointer-events-auto">
+                              <input
+                                type="text"
+                                placeholder="Header"
+                                value={(block.content as any)?.header || ''}
+                                onChange={(e) => {
+                                  const content = block.content as { header?: string; description?: string };
+                                  handleSaveBlock({
+                                    ...block,
+                                    content: {
+                                      ...content,
+                                      header: e.target.value,
+                                    },
+                                  });
+                                }}
+                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Description"
+                                value={(block.content as any)?.description || ''}
+                                onChange={(e) => {
+                                  const content = block.content as { header?: string; description?: string };
+                                  handleSaveBlock({
+                                    ...block,
+                                    content: {
+                                      ...content,
+                                      description: e.target.value,
+                                    },
+                                  });
+                                }}
+                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                              />
+                            </div>
+                          </div>
+                        ) : null}
                       </>
                     )}
                   </div>
