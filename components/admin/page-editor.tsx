@@ -224,47 +224,6 @@ export function PageEditor({
   }, [imageItems]);
 
   useEffect(() => {
-    if (!Object.keys(measuredSizes).length) return;
-    setBlocks((prev) => {
-      let changed = false;
-      const next = prev.map((block) => {
-        if (block.block_type !== 'image') return block;
-        const content = block.content as { url?: string };
-        if (!content?.url) return block;
-
-        const size = measuredSizes[content.url];
-        if (!size) return block;
-
-        if (normalizedImageLayoutsRef.current.has(block.layout.i)) {
-          return block;
-        }
-
-        const ratio =
-          size.width > 0 && size.height > 0 ? size.width / size.height : NaN;
-        if (!Number.isFinite(ratio)) {
-          return block;
-        }
-        imageRatioRef.current[block.layout.i] = ratio;
-        const newH = ratioToPxH(block.layout.w, ratio, containerWidth);
-        if (block.layout.h !== newH) {
-          changed = true;
-          normalizedImageLayoutsRef.current.add(block.layout.i);
-          return {
-            ...block,
-            layout: { ...block.layout, h: newH },
-          };
-        }
-
-        normalizedImageLayoutsRef.current.add(block.layout.i);
-        return block;
-      });
-
-      if (!changed) return prev;
-      return resolveAllOverlaps(next);
-    });
-  }, [measuredSizes, containerWidth, resolveAllOverlaps]);
-
-  useEffect(() => {
     blocks.forEach((block) => {
       if (block.block_type !== 'image') return;
       const content = block.content as { url?: string };
@@ -544,6 +503,47 @@ export function PageEditor({
     },
     [getBlockHeightPx]
   );
+
+  useEffect(() => {
+    if (!Object.keys(measuredSizes).length) return;
+    setBlocks((prev) => {
+      let changed = false;
+      const next = prev.map((block) => {
+        if (block.block_type !== 'image') return block;
+        const content = block.content as { url?: string };
+        if (!content?.url) return block;
+
+        const size = measuredSizes[content.url];
+        if (!size) return block;
+
+        if (normalizedImageLayoutsRef.current.has(block.layout.i)) {
+          return block;
+        }
+
+        const ratio =
+          size.width > 0 && size.height > 0 ? size.width / size.height : NaN;
+        if (!Number.isFinite(ratio)) {
+          return block;
+        }
+        imageRatioRef.current[block.layout.i] = ratio;
+        const newH = ratioToPxH(block.layout.w, ratio, containerWidth);
+        if (block.layout.h !== newH) {
+          changed = true;
+          normalizedImageLayoutsRef.current.add(block.layout.i);
+          return {
+            ...block,
+            layout: { ...block.layout, h: newH },
+          };
+        }
+
+        normalizedImageLayoutsRef.current.add(block.layout.i);
+        return block;
+      });
+
+      if (!changed) return prev;
+      return resolveAllOverlaps(next);
+    });
+  }, [measuredSizes, containerWidth, resolveAllOverlaps]);
 
   const handleAddBlock = useCallback((type: 'image' | 'vimeo') => {
     // Find first row (y=0) and calculate used width there
@@ -1023,7 +1023,7 @@ export function PageEditor({
                       return resolveAllOverlaps(next);
                     });
                   }}
-                  onResizeStop={(_, __, ref, __, position) => {
+                  onResizeStop={(_, __, ref, _delta, position) => {
                     const nextWidthPx = ref.offsetWidth;
                     const nextW = pxToGridW(nextWidthPx, containerWidth);
                     const nextH = ratio
