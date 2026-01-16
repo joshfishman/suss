@@ -61,17 +61,10 @@ export default async function ProjectsPage({
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const editMode = isEditMode(resolvedSearchParams);
-  const editRaw = resolvedSearchParams?.edit;
-  const editRawText = Array.isArray(editRaw) ? editRaw.join(',') : editRaw;
 
   if (editMode) {
     return (
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-        {editRaw ? (
-          <div className="fixed top-4 right-4 z-[90] bg-white text-black px-3 py-1 rounded-full text-xs shadow">
-            editRaw={editRawText} editMode=true
-          </div>
-        ) : null}
         <PageContent editMode />
       </Suspense>
     );
@@ -79,11 +72,6 @@ export default async function ProjectsPage({
 
   return (
     <PageShell>
-      {editRaw ? (
-        <div className="fixed top-4 right-4 z-[90] bg-white text-black px-3 py-1 rounded-full text-xs shadow">
-          editRaw={editRawText} editMode=false
-        </div>
-      ) : null}
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
         <PageContent editMode={false} />
       </Suspense>
