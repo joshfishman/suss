@@ -830,16 +830,25 @@ export function PageEditor({
   }, [title, description, draftMode]);
 
   const handleDeletePage = useCallback(async () => {
+    // Don't allow deleting reserved pages
+    const reservedSlugs = ['home', 'about', 'projects'];
+    if (reservedSlugs.includes(page.slug)) {
+      window.alert('Cannot delete reserved pages (home, about, projects)');
+      return;
+    }
+
     const confirmed = window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`);
     if (!confirmed) return;
     
     try {
-      const response = await fetch(`/api/pages/${page.slug}${draftMode ? '?draft=1' : ''}`, {
+      const response = await fetch(`/api/pages/${page.slug}?draft=1`, {
         method: 'DELETE',
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        console.error('Failed to delete page');
+        window.alert(`Failed to delete page: ${data.error || 'Unknown error'}`);
         return;
       }
 
@@ -847,8 +856,9 @@ export function PageEditor({
       router.push('/home?edit=1');
     } catch (error) {
       console.error('Failed to delete page:', error);
+      window.alert('Failed to delete page. Check console for details.');
     }
-  }, [title, page.slug, draftMode, router]);
+  }, [title, page.slug, router]);
 
   const handleEditBlock = useCallback((block: ContentBlock) => {
     setEditorInitialTab('upload');
@@ -1149,25 +1159,27 @@ export function PageEditor({
                   {pageOptions
                     .filter((opt) => opt.page_type !== 'project')
                     .map((option) => (
-                      <DropdownMenuItem
+                      <button
                         key={option.id}
-                        onSelect={() => router.push(`/${option.slug}?edit=1`)}
-                        className={`cursor-pointer ${option.slug === page.slug ? 'bg-white/10' : ''}`}
+                        type="button"
+                        onClick={() => router.push(`/${option.slug}?edit=1`)}
+                        className={`w-full text-left px-2 py-1.5 text-sm cursor-pointer hover:bg-white/10 rounded ${option.slug === page.slug ? 'bg-white/10' : ''}`}
                       >
                         {option.title}
-                      </DropdownMenuItem>
+                      </button>
                     ))}
                   <div className="px-2 py-1.5 text-xs text-white/50 uppercase tracking-wider mt-2">Projects</div>
                   {pageOptions
                     .filter((opt) => opt.page_type === 'project')
                     .map((option) => (
-                      <DropdownMenuItem
+                      <button
                         key={option.id}
-                        onSelect={() => router.push(`/${option.slug}?edit=1`)}
-                        className={`cursor-pointer ${option.slug === page.slug ? 'bg-white/10' : ''}`}
+                        type="button"
+                        onClick={() => router.push(`/${option.slug}?edit=1`)}
+                        className={`w-full text-left px-2 py-1.5 text-sm cursor-pointer hover:bg-white/10 rounded ${option.slug === page.slug ? 'bg-white/10' : ''}`}
                       >
                         {option.title}
-                      </DropdownMenuItem>
+                      </button>
                     ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1455,6 +1467,7 @@ export function PageEditor({
                   }}
                 >
                   <div
+                    dir="ltr"
                     className={`relative rounded-lg overflow-hidden group w-full h-full ${
                       block.block_type === 'vimeo' ? 'bg-black' : 'bg-gray-100'
                     }`}
