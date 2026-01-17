@@ -116,19 +116,21 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
       />
       {/* Top edge cover to hide Vimeo letterbox line */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-black z-[1]" />
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          handleTogglePlay();
-        }}
-        className={`absolute inset-0 z-10 flex items-center justify-center bg-black/30 text-white transition-opacity ${
-          showControls ? 'opacity-100' : 'opacity-0'
-        }`}
-        style={{ pointerEvents: showControls ? 'auto' : 'none' }}
-      >
-        {isPlaying ? <Pause className="w-10 h-10" /> : <Play className="w-10 h-10" />}
-      </button>
+      {!isEditing && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleTogglePlay();
+          }}
+          className={`absolute inset-0 z-10 flex items-center justify-center bg-black/30 text-white transition-opacity ${
+            showControls ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{ pointerEvents: showControls ? 'auto' : 'none' }}
+        >
+          {isPlaying ? <Pause className="w-10 h-10" /> : <Play className="w-10 h-10" />}
+        </button>
+      )}
       {content.caption && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm z-20">
           {content.caption}

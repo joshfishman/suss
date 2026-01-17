@@ -1512,12 +1512,13 @@ export function PageEditor({
                     {!readOnly && showEditControls && (
                       <>
                         {block.block_type === 'vimeo' ? (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2">
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2 z-30">
                             <input
                               type="text"
                               placeholder="Vimeo ID"
                               value={(block.content as any)?.vimeo_id || ''}
                               onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
                               className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                             />
                             <input
@@ -1525,6 +1526,7 @@ export function PageEditor({
                               placeholder="Title"
                               value={(block.content as any)?.title || ''}
                               onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
                               className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                             />
                             <input
@@ -1532,6 +1534,7 @@ export function PageEditor({
                               placeholder="Caption"
                               value={(block.content as any)?.caption || ''}
                               onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
                               className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                             />
                             <div className="flex justify-end gap-2 pt-1">
