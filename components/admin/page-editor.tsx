@@ -1519,9 +1519,12 @@ export function PageEditor({
                       : Math.max(80, ref.offsetHeight);
                     const nextXRaw = pxToGridX(position.x, containerWidth);
                     let nextX = clampGridX(nextXRaw, nextW);
+                    const shouldSnapFullWidth =
+                      block.block_type !== 'text' && block.block_type !== 'header';
                     if (
-                      position.x + nextWidthPx >= fullWidthPx - 1 ||
-                      (nextX === 0 && nextW >= GRID_COLS - 1)
+                      shouldSnapFullWidth &&
+                      (position.x + nextWidthPx >= fullWidthPx - 1 ||
+                        (nextX === 0 && nextW >= GRID_COLS - 1))
                     ) {
                       nextW = GRID_COLS;
                       nextX = 0;

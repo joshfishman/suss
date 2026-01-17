@@ -11,7 +11,7 @@ interface TextBlockProps {
 export function TextBlock({ content, isEditing = false, onChange }: TextBlockProps) {
   return (
     <div
-      className="relative w-full h-full flex flex-col justify-center p-6 bg-black text-white"
+      className="relative w-full h-full flex flex-col justify-start py-20 px-0 bg-black text-white"
       dir="ltr"
     >
       <h3
@@ -25,7 +25,7 @@ export function TextBlock({ content, isEditing = false, onChange }: TextBlockPro
             header: e.currentTarget.textContent || '',
           });
         }}
-        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
+        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded text-left"
         data-placeholder="Header"
       >
         {content.header || ''}
@@ -42,7 +42,7 @@ export function TextBlock({ content, isEditing = false, onChange }: TextBlockPro
               description: e.currentTarget.textContent || '',
             });
           }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
+          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded text-left"
           data-placeholder="Description"
         >
           {content.description || ''}
