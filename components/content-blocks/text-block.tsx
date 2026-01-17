@@ -11,7 +11,7 @@ interface TextBlockProps {
 export function TextBlock({ content, isEditing = false, onChange }: TextBlockProps) {
   return (
     <div
-      className="relative w-full h-full flex flex-col justify-start py-20 px-0 bg-black text-white"
+      className="relative w-full h-full flex flex-col justify-start py-5 px-0 bg-black text-white"
       dir="ltr"
     >
       <h3

@@ -1582,7 +1582,7 @@ export function PageEditor({
                       lockAspectRatio={ratio ?? false}
                       style={{
                         zIndex:
-                          draggingBlockId === block.id ? 50 : Math.max(1, 10000 - Math.round(yPx)),
+                          draggingBlockId === block.id ? 100000 : Math.max(1, 10000 - Math.round(yPx)),
                       }}
                       dragGrid={
                         !isSingleColumn && layoutMode === 'snap'
@@ -1722,9 +1722,6 @@ export function PageEditor({
                               ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
                               : b
                           );
-                          if (block.block_type === 'text') {
-                            return next;
-                          }
                           const resolved = resolveAllOverlaps(next, block.id);
                           const compacted = compactVertical(resolved, block.id);
                           return layoutMode === 'snap' ? packMasonry(compacted) : compacted;
