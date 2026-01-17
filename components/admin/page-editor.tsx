@@ -207,7 +207,8 @@ export function PageEditor({
   }, []);
 
   useEffect(() => {
-    if (readOnly) return;
+    // Load pages when in edit mode (either via prop or URL)
+    if (readOnly && !urlEditMode) return;
     let cancelled = false;
     const loadPages = async () => {
       try {
@@ -224,7 +225,7 @@ export function PageEditor({
     return () => {
       cancelled = true;
     };
-  }, [readOnly]);
+  }, [readOnly, urlEditMode]);
 
   useEffect(() => {
     if (page.slug !== 'home') return;
