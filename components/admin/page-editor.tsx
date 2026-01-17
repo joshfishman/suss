@@ -223,6 +223,8 @@ export function PageEditor({
   const lastImageUrlByLayoutRef = useRef<Record<string, string>>({});
   const imageRatioRef = useRef<Record<string, number>>({});
   const isSingleColumn = containerWidth < 640;
+  const textResizeObserverRef = useRef<ResizeObserver | null>(null);
+  const textBlockIdsByElRef = useRef(new Map<Element, string>());
 
   // Sync edit controls with URL param changes (for instant toolbar appearance)
   useEffect(() => {
@@ -305,6 +307,55 @@ export function PageEditor({
       cancelled = true;
     };
   }, [readOnly, urlEditMode]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const updates = new Map<string, number>();
+      for (const entry of entries) {
+        const id = textBlockIdsByElRef.current.get(entry.target);
+        if (!id) continue;
+        updates.set(id, Math.round(entry.contentRect.height));
+      }
+      if (updates.size === 0) return;
+      setBlocksTransient((prev) => {
+        let changed = false;
+        const next = prev.map((block) => {
+          if (block.block_type !== 'text') return block;
+          const nextH = updates.get(block.id);
+          if (!nextH || Math.abs(block.layout.h - nextH) < 1) return block;
+          changed = true;
+          return { ...block, layout: { ...block.layout, h: nextH } };
+        });
+        return changed ? next : prev;
+      });
+    });
+    textResizeObserverRef.current = observer;
+    return () => {
+      observer.disconnect();
+      textResizeObserverRef.current = null;
+    };
+  }, [setBlocksTransient]);
+
+  const setTextBlockRef = useCallback(
+    (blockId: string) => (node: HTMLDivElement | null) => {
+      const observer = textResizeObserverRef.current;
+      if (!observer) return;
+      if (node) {
+        textBlockIdsByElRef.current.set(node, blockId);
+        observer.observe(node);
+      } else {
+        for (const [el, id] of textBlockIdsByElRef.current.entries()) {
+          if (id === blockId) {
+            observer.unobserve(el);
+            textBlockIdsByElRef.current.delete(el);
+            break;
+          }
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (page.slug !== 'home' && page.slug !== 'projects') return;
@@ -1716,6 +1767,7 @@ export function PageEditor({
                       }}
                     >
                       <div
+                        ref={block.block_type === 'text' ? setTextBlockRef(block.id) : undefined}
                         dir="ltr"
                         className={`relative rounded-lg overflow-hidden group w-full h-full ${
                           block.block_type === 'vimeo' ? 'bg-black' : 'bg-gray-100'
