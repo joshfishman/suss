@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  type PageRow = { id: any; slug: any; title: any; page_type?: any | null };
+  type PageRow = { id: any; slug: any; title: any; page_type: any | null };
 
   let { data, error } = await supabase
     .from('pages')
