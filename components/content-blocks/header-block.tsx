@@ -11,7 +11,6 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
     <div
       className="relative w-full h-full flex flex-col justify-center p-6 bg-black text-white"
       dir="ltr"
-      style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
     >
       <h3
         dir="ltr"
@@ -24,13 +23,12 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
             header: e.currentTarget.textContent || '',
           });
         }}
-        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2"
-        style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
+        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
         data-placeholder="Header"
       >
         {content.header || ''}
       </h3>
-      {content.description ? (
+      {content.description || isEditing ? (
         <p
           dir="ltr"
           contentEditable={isEditing}
@@ -42,26 +40,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
               description: e.currentTarget.textContent || '',
             });
           }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2"
-          style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
-          data-placeholder="Description"
-        >
-          {content.description}
-        </p>
-      ) : isEditing ? (
-        <p
-          dir="ltr"
-          contentEditable
-          suppressContentEditableWarning
-          onInput={(e) => {
-            if (!onChange) return;
-            onChange({
-              ...content,
-              description: e.currentTarget.textContent || '',
-            });
-          }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2"
-          style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
+          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
           data-placeholder="Description"
         >
           {content.description || ''}

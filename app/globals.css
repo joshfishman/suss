@@ -164,25 +164,14 @@
   pointer-events: none;
 }
 
-/* Ensure LTR typing for contenteditable fields */
-[contenteditable] {
-  direction: ltr !important;
-  unicode-bidi: isolate !important;
-  text-align: left !important;
-}
-
-/* Force LTR on all text content */
+/* Force LTR on html/body */
 html, body {
   direction: ltr;
 }
 
-p, h1, h2, h3, h4, h5, h6, span, div, li, a {
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-
-/* Force LTR on content blocks */
-[dir="ltr"] {
+/* Force LTR on all input and contenteditable elements */
+input, textarea, [contenteditable] {
   direction: ltr !important;
-  unicode-bidi: isolate !important;
+  text-align: left !important;
+  unicode-bidi: bidi-override !important;
 }

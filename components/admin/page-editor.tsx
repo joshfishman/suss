@@ -1287,7 +1287,6 @@ export function PageEditor({
                 }
               }}
               className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text text-left"
-              style={{ direction: 'ltr', textAlign: 'left' }}
               data-placeholder="Page Title"
             >
               {heroTitle}
@@ -1299,7 +1298,6 @@ export function PageEditor({
               suppressContentEditableWarning
               onBlur={(e) => setDescription(e.currentTarget.textContent || '')}
               className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl outline-none focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text text-left"
-              style={{ direction: 'ltr', textAlign: 'left' }}
               data-placeholder="Click to add a description..."
             >
               {description || ''}
@@ -1594,7 +1592,7 @@ export function PageEditor({
         </div>
 
         {page.slug === 'home' && (
-          <section className="container mx-auto px-8 pb-24" style={{ direction: 'ltr', textAlign: 'left' }}>
+          <section className="container mx-auto px-8 pb-24">
             <div className="mb-6">
               <h2 className="text-2xl md:text-3xl font-light tracking-tight">Projects</h2>
             </div>
@@ -1607,11 +1605,10 @@ export function PageEditor({
                   const isVimeo = firstBlock?.block_type === 'vimeo';
 
                   return (
-                    <div key={project.id} className="group" style={{ direction: 'ltr', textAlign: 'left' }}>
+                    <div key={project.id} className="group">
                       <Link
                         href={`/${project.slug}`}
                         className="mb-3 text-lg font-light inline-flex text-white hover:text-white/90"
-                        style={{ direction: 'ltr' }}
                       >
                         {project.title}
                       </Link>
