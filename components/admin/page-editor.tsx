@@ -121,7 +121,47 @@ export function PageEditor({
   const searchParams = useSearchParams();
   // Check URL for edit param to show toolbar immediately (before server re-renders)
   const urlEditMode = searchParams.get('edit') === '1' || searchParams.get('edit') === 'true';
-  const [blocks, setBlocks] = useState<ContentBlock[]>(() => normalizeInitialBlocks(initialBlocks));
+  const [blocks, setBlocksRaw] = useState<ContentBlock[]>(() => normalizeInitialBlocks(initialBlocks));
+  
+  // Undo/redo history
+  const undoStackRef = useRef<ContentBlock[][]>([]);
+  const redoStackRef = useRef<ContentBlock[][]>([]);
+  const isUndoRedoRef = useRef(false);
+  
+  const setBlocks = useCallback((updater: ContentBlock[] | ((prev: ContentBlock[]) => ContentBlock[])) => {
+    setBlocksRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Don't record history during undo/redo operations
+      if (!isUndoRedoRef.current) {
+        undoStackRef.current.push(prev);
+        // Limit history to 50 entries
+        if (undoStackRef.current.length > 50) {
+          undoStackRef.current.shift();
+        }
+        // Clear redo stack on new change
+        redoStackRef.current = [];
+      }
+      return next;
+    });
+  }, []);
+  
+  const handleUndo = useCallback(() => {
+    if (undoStackRef.current.length === 0) return;
+    const prev = undoStackRef.current.pop()!;
+    setBlocksRaw((current) => {
+      redoStackRef.current.push(current);
+      return prev;
+    });
+  }, []);
+  
+  const handleRedo = useCallback(() => {
+    if (redoStackRef.current.length === 0) return;
+    const next = redoStackRef.current.pop()!;
+    setBlocksRaw((current) => {
+      undoStackRef.current.push(current);
+      return next;
+    });
+  }, []);
   const [title, setTitle] = useState(page.title);
   const [heroTitle, setHeroTitle] = useState(page.hero_title || page.title);
   const [description, setDescription] = useState(page.description || '');
@@ -179,6 +219,30 @@ export function PageEditor({
       setShowEditControls(false);
     }
   }, [urlEditMode, readOnly, showEditControls]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    if (readOnly) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+      
+      if (modifier && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (modifier && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      } else if (modifier && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [readOnly, handleUndo, handleRedo]);
 
   useEffect(() => {
     if (!containerRef.current) return;
