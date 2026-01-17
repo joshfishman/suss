@@ -29,8 +29,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ArrowLeft, Trash2, Video, Image as ImageIcon, Check, Loader2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { SiteHeader } from '@/components/site-header';
-import { SiteFooter } from '@/components/site-footer';
+import { PageTemplate } from '@/components/page-template';
+import { PageHero } from '@/components/page-hero';
 
 interface ImageItem {
   id: string;
@@ -127,12 +127,13 @@ export function PageEditor({
   const undoStackRef = useRef<ContentBlock[][]>([]);
   const redoStackRef = useRef<ContentBlock[][]>([]);
   const isUndoRedoRef = useRef(false);
+  const isTransientRef = useRef(false);
   
   const setBlocks = useCallback((updater: ContentBlock[] | ((prev: ContentBlock[]) => ContentBlock[])) => {
     setBlocksRaw((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       // Don't record history during undo/redo operations
-      if (!isUndoRedoRef.current) {
+      if (!isUndoRedoRef.current && !isTransientRef.current) {
         undoStackRef.current.push(prev);
         // Limit history to 50 entries
         if (undoStackRef.current.length > 50) {
@@ -144,6 +145,18 @@ export function PageEditor({
       return next;
     });
   }, []);
+
+  const setBlocksTransient = useCallback(
+    (updater: ContentBlock[] | ((prev: ContentBlock[]) => ContentBlock[])) => {
+      isTransientRef.current = true;
+      setBlocksRaw((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        isTransientRef.current = false;
+        return next;
+      });
+    },
+    []
+  );
   
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return;
@@ -179,6 +192,7 @@ export function PageEditor({
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   // Show edit controls if URL has edit param OR if not readOnly
   const [showEditControls, setShowEditControls] = useState(!readOnly || urlEditMode);
+  const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
   const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
   const [editorInitialTab, setEditorInitialTab] = useState<'upload' | 'existing'>('upload');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -208,6 +222,7 @@ export function PageEditor({
   const measuredSizesRef = useRef<Record<string, { width: number; height: number }>>({});
   const lastImageUrlByLayoutRef = useRef<Record<string, string>>({});
   const imageRatioRef = useRef<Record<string, number>>({});
+  const isSingleColumn = containerWidth < 640;
 
   // Sync edit controls with URL param changes (for instant toolbar appearance)
   useEffect(() => {
@@ -637,8 +652,12 @@ export function PageEditor({
   );
 
   const resolveAllOverlaps = useCallback(
-    (nextBlocks: ContentBlock[]) => {
+    (nextBlocks: ContentBlock[], priorityId?: string) => {
       const sorted = [...nextBlocks].sort((a, b) => {
+        if (priorityId) {
+          if (a.id === priorityId && b.id !== priorityId) return -1;
+          if (b.id === priorityId && a.id !== priorityId) return 1;
+        }
         if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
         return a.layout.x - b.layout.x;
       });
@@ -649,7 +668,7 @@ export function PageEditor({
       for (const block of sorted) {
         let candidate = {
           ...block,
-          layout: { ...block.layout, y: 0 },
+          layout: { ...block.layout },
         };
         let safety = 0;
         const nextYAfterOverlap = (item: ContentBlock) => {
@@ -686,6 +705,69 @@ export function PageEditor({
 
         placed.push(candidate);
         resolvedById.set(candidate.id, candidate);
+      }
+
+      if (!changed) return nextBlocks;
+      return nextBlocks.map((block) => resolvedById.get(block.id) ?? block);
+    },
+    [getBlockHeightPx]
+  );
+
+  const compactVertical = useCallback(
+    (nextBlocks: ContentBlock[], priorityId?: string) => {
+      const resolvedById = new Map<string, ContentBlock>();
+      const colHeights = Array.from({ length: GRID_COLS }, () => 0);
+      let changed = false;
+
+      const priorityBlock = priorityId ? nextBlocks.find((block) => block.id === priorityId) : null;
+      const priorityH = priorityBlock ? getBlockHeightPx(priorityBlock) : 0;
+      const priorityBottom = priorityBlock ? priorityBlock.layout.y + priorityH + GRID_GAP : 0;
+      const priorityX0 = priorityBlock?.layout.x ?? 0;
+      const priorityX1 = priorityBlock ? priorityBlock.layout.x + priorityBlock.layout.w : 0;
+      if (priorityBlock) {
+        resolvedById.set(priorityBlock.id, priorityBlock);
+      }
+
+      const ordered = nextBlocks
+        .filter((block) => block.id !== priorityId)
+        .sort((a, b) => {
+          if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
+          return a.layout.x - b.layout.x;
+        });
+
+      for (const block of ordered) {
+        const blockW = Math.min(Math.max(block.layout.w, 1), GRID_COLS);
+        const spanHeights = colHeights.slice(block.layout.x, block.layout.x + blockW);
+        let nextY = spanHeights.length ? Math.max(...spanHeights) : 0;
+
+        if (priorityBlock) {
+          const overlapsPriority =
+            block.layout.x < priorityX1 && block.layout.x + blockW > priorityX0;
+          if (overlapsPriority) {
+            const blockH = getBlockHeightPx(block);
+            const maxAbove = priorityBlock.layout.y - blockH - GRID_GAP;
+            if (nextY > maxAbove) {
+              nextY = Math.max(priorityBottom, nextY);
+            }
+          }
+        }
+
+        if (block.layout.y !== nextY) {
+          changed = true;
+        }
+        const nextBlock = {
+          ...block,
+          layout: {
+            ...block.layout,
+            y: nextY,
+          },
+        };
+        const blockH = getBlockHeightPx(nextBlock);
+        const nextBottom = nextY + blockH + GRID_GAP;
+        for (let i = nextBlock.layout.x; i < nextBlock.layout.x + blockW; i += 1) {
+          colHeights[i] = Math.max(colHeights[i], nextBottom);
+        }
+        resolvedById.set(nextBlock.id, nextBlock);
       }
 
       if (!changed) return nextBlocks;
@@ -1389,386 +1471,467 @@ export function PageEditor({
       </div>
       )}
 
-      {/* Site header - matches public layout */}
-      <SiteHeader />
-
-      <main className={`${readOnly ? 'pt-20' : 'pt-32'} flex-1`}>
-        {/* Page hero - editable (matches public styling) */}
-        <section className="py-20 px-8">
-          <div className="container mx-auto px-8">
-            <h1
-              ref={titleRef}
-              dir="ltr"
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => setHeroTitle(e.currentTarget.textContent || '')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                }
-              }}
-              className="text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text text-left"
-              data-placeholder="Page Title"
-            >
-              {heroTitle}
-            </h1>
-            <p
-              ref={descriptionRef}
-              dir="ltr"
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => setDescription(e.currentTarget.textContent || '')}
-              className="text-lg md:text-xl font-light text-white/70 leading-relaxed max-w-2xl outline-none focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text text-left"
-              data-placeholder="Click to add a description..."
-            >
-              {description || ''}
-            </p>
-          </div>
-        </section>
-
-        {/* Content grid */}
-        <div className="container mx-auto px-8 pb-24" ref={containerRef}>
-        {blocks.length === 0 ? (
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-            <p className="text-gray-400 mb-4">Drag images here or use the toolbar to add content</p>
-            <div className="flex justify-center gap-2">
-              <Button onClick={() => handleAddBlock('image')} variant="outline" size="sm">
-                <ImageIcon className="w-4 h-4 mr-2" />
-                Add Image
-              </Button>
-              <Button onClick={() => handleAddBlock('vimeo')} variant="outline" size="sm">
-                <Video className="w-4 h-4 mr-2" />
-                Add Vimeo
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div
-            className="relative w-full min-h-[400px]"
-            style={{
-              minHeight: Math.max(
-                400,
-                (blocks.length
-                  ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
-                  : 1) + GRID_GAP
-              ),
-            }}
-          >
-            {blocks.map((block) => {
-              const ratio = getRatioForBlock(block);
-              const widthPx = gridToPxW(block.layout.w, containerWidth);
-              const heightPx = ratio ? widthPx / ratio : block.layout.h;
-              const xPx = gridToPxX(block.layout.x, containerWidth);
-              const yPx = block.layout.y;
-
-              return (
-                <Rnd
-                  key={block.layout.i}
-                  bounds="parent"
-                  size={{ width: widthPx, height: heightPx }}
-                  position={{ x: xPx, y: yPx }}
-                  lockAspectRatio={ratio ?? false}
-                  dragGrid={
-                    layoutMode === 'snap' ? [colWidth(containerWidth) + GRID_GAP, 1] : undefined
-                  }
-                  resizeGrid={
-                    layoutMode === 'snap' ? [colWidth(containerWidth) + GRID_GAP, 1] : undefined
-                  }
-                  minWidth={gridToPxW(1, containerWidth)}
-                  maxWidth={gridToPxW(GRID_COLS, containerWidth)}
-                  enableResizing={
-                    !readOnly && showEditControls
-                      ? {
-                          top: false,
-                          right: true,
-                          bottom: true,
-                          left: true,
-                          topRight: false,
-                          bottomRight: false,
-                          bottomLeft: false,
-                          topLeft: false,
-                        }
-                      : false
-                  }
-                  disableDragging={readOnly || !showEditControls}
-                  onDragStop={(_, data) => {
-                    const nextXRaw = pxToGridX(data.x, containerWidth);
-                    const nextY = Math.max(0, data.y);
-                    const nextX = clampGridX(nextXRaw, block.layout.w);
-                    const effectiveH = getBlockHeightPx(block, block.layout.w);
-                    const nextLayout = { x: nextX, y: nextY, w: block.layout.w, h: effectiveH };
-                    const resolvedLayout =
-                      layoutMode === 'snap' ? resolveOverlap(block.id, nextLayout) : nextLayout;
-
-                    setBlocks((prev) => {
-                      const next = prev.map((b) =>
-                        b.id === block.id
-                          ? { ...b, layout: { ...b.layout, x: resolvedLayout.x, y: resolvedLayout.y } }
-                          : b
-                      );
-                      return layoutMode === 'snap' ? packMasonry(next) : next;
-                    });
-                  }}
-                  onResizeStop={(_, __, ref, _delta, position) => {
-                    const nextWidthPx = ref.offsetWidth;
-                    const fullWidthPx = gridToPxW(GRID_COLS, containerWidth);
-                    let nextW = pxToGridW(nextWidthPx, containerWidth);
-                    const nextH = ratio
-                      ? ratioToPxH(nextW, ratio, containerWidth)
-                      : Math.max(80, ref.offsetHeight);
-                    const nextXRaw = pxToGridX(position.x, containerWidth);
-                    let nextX = clampGridX(nextXRaw, nextW);
-                    const shouldSnapFullWidth =
-                      block.block_type !== 'text' && block.block_type !== 'header';
-                    if (
-                      shouldSnapFullWidth &&
-                      (position.x + nextWidthPx >= fullWidthPx - 1 ||
-                        (nextX === 0 && nextW >= GRID_COLS - 1))
-                    ) {
-                      nextW = GRID_COLS;
-                      nextX = 0;
-                    }
-                    const nextY = Math.max(0, position.y);
-
-                    setBlocks((prev) => {
-                      const next = prev.map((b) =>
-                        b.id === block.id
-                          ? {
-                              ...b,
-                              layout: {
-                                ...b.layout,
-                                w: nextW,
-                                h: nextH,
-                                x: nextX,
-                                y: nextY,
-                              },
-                            }
-                          : b
-                      );
-                      return layoutMode === 'snap' ? packMasonry(next) : next;
-                    });
-                  }}
-                >
-                  <div
-                    dir="ltr"
-                    className={`relative rounded-lg overflow-hidden group w-full h-full ${
-                      block.block_type === 'vimeo' ? 'bg-black' : 'bg-gray-100'
-                    }`}
-                    onDragOver={(event) => {
-                      if (block.block_type === 'image') {
-                        event.preventDefault();
-                      }
-                    }}
-                    onDrop={(event) => {
-                      if (block.block_type !== 'image') return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      const file = event.dataTransfer?.files?.[0];
-                      if (file) {
-                        handleUploadToBlock(block, file);
-                      }
-                    }}
-                  >
-                    <BlockRenderer
-                      block={block}
-                      isEditing={!readOnly && showEditControls}
-                      onHeaderChange={handleUpdateHeaderField}
-                      onTextChange={handleUpdateTextField}
-                    />
-                    {!readOnly && showEditControls && (
-                      <>
-                        {block.block_type === 'vimeo' ? (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2 z-30">
-                            <input
-                              type="text"
-                              placeholder="Vimeo ID"
-                              value={(block.content as any)?.vimeo_id || ''}
-                              onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Title"
-                              value={(block.content as any)?.title || ''}
-                              onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Caption"
-                              value={(block.content as any)?.caption || ''}
-                              onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                            />
-                            <div className="flex justify-end gap-2 pt-1">
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteBlock(block.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : block.block_type === 'image' ? (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex flex-col gap-2 pointer-events-none">
-                            <div className="flex gap-2 pointer-events-auto justify-end">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectExisting(block);
-                                }}
-                                className="bg-white text-black hover:bg-gray-100"
-                              >
-                                Existing
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteBlock(block.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            <div className="flex flex-col gap-2 pointer-events-auto">
-                              <input
-                                type="text"
-                                placeholder="Alt text"
-                                value={(block.content as any)?.alt || ''}
-                                onChange={(e) => {
-                                  const content = block.content as { url?: string; alt?: string; caption?: string };
-                                  handleSaveBlock({
-                                    ...block,
-                                    content: {
-                                      ...content,
-                                      url: content.url || '',
-                                      alt: e.target.value,
-                                    },
-                                  });
-                                }}
-                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                              />
-                              <input
-                                type="text"
-                                placeholder="Caption"
-                                value={(block.content as any)?.caption || ''}
-                                onChange={(e) => {
-                                  const content = block.content as { url?: string; alt?: string; caption?: string };
-                                  handleSaveBlock({
-                                    ...block,
-                                    content: {
-                                      ...content,
-                                      url: content.url || '',
-                                      caption: e.target.value,
-                                    },
-                                  });
-                                }}
-                                className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
-                              />
-                            </div>
-                          </div>
-                        ) : block.block_type === 'header' ? (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
-                            <div className="flex gap-2 pointer-events-auto">
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteBlock(block.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : block.block_type === 'text' ? (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
-                            <div className="flex gap-2 pointer-events-auto">
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteBlock(block.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                </Rnd>
-              );
-            })}
-          </div>
-        )}
-        </div>
-
-        {(page.slug === 'home' || page.slug === 'projects') && (
-          <section className="container mx-auto px-8 pb-24">
-            {page.slug === 'home' && (
-              <div className="mb-6">
-                <h2 className="text-2xl md:text-3xl font-light tracking-tight">Projects</h2>
+      <PageTemplate
+        readOnly={readOnly}
+        contentRef={containerRef}
+        hero={
+          <PageHero
+            title={heroTitle}
+            description={description}
+            isEditing={!readOnly}
+            onTitleChange={setHeroTitle}
+            onDescriptionChange={setDescription}
+            titleRef={titleRef}
+            descriptionRef={descriptionRef}
+          />
+        }
+        content={
+          <>
+            {blocks.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+                <p className="text-gray-400 mb-4">Drag images here or use the toolbar to add content</p>
+                <div className="flex justify-center gap-2">
+                  <Button onClick={() => handleAddBlock('image')} variant="outline" size="sm">
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Add Image
+                  </Button>
+                  <Button onClick={() => handleAddBlock('vimeo')} variant="outline" size="sm">
+                    <Video className="w-4 h-4 mr-2" />
+                    Add Vimeo
+                  </Button>
+                </div>
               </div>
-            )}
-            {projectPreviews.length === 0 ? (
-              <p className="text-white/60 text-sm">No projects yet.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {projectPreviews.map((project) => {
-                  const firstBlock = project.first_block;
-                  const isVimeo = firstBlock?.block_type === 'vimeo';
+              <div
+                className="relative w-full min-h-[400px]"
+                style={{
+                  minHeight: Math.max(
+                    400,
+                    (blocks.length
+                      ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
+                      : 1) + GRID_GAP
+                  ),
+                }}
+              >
+                {blocks.map((block) => {
+                  const ratio = getRatioForBlock(block);
+                  const widthPx = isSingleColumn
+                    ? containerWidth
+                    : gridToPxW(block.layout.w, containerWidth);
+                  const heightPx = ratio ? widthPx / ratio : block.layout.h;
+                  const xPx = isSingleColumn ? 0 : gridToPxX(block.layout.x, containerWidth);
+                  const yPx = block.layout.y;
 
                   return (
-                    <div key={project.id} className="group">
-                      <Link
-                        href={`/${project.slug}`}
-                        className="mb-3 text-lg font-light inline-flex text-white hover:text-white/90"
+                    <Rnd
+                      key={block.layout.i}
+                      bounds="parent"
+                      size={{ width: widthPx, height: heightPx }}
+                      position={{ x: xPx, y: yPx }}
+                      lockAspectRatio={ratio ?? false}
+                      style={{
+                        zIndex: draggingBlockId === block.id ? 50 : 1,
+                      }}
+                      dragGrid={
+                        !isSingleColumn && layoutMode === 'snap'
+                          ? [colWidth(containerWidth) + GRID_GAP, 1]
+                          : undefined
+                      }
+                      resizeGrid={
+                        !isSingleColumn && layoutMode === 'snap'
+                          ? [colWidth(containerWidth) + GRID_GAP, 1]
+                          : undefined
+                      }
+                      minWidth={isSingleColumn ? containerWidth : gridToPxW(1, containerWidth)}
+                      maxWidth={isSingleColumn ? containerWidth : gridToPxW(GRID_COLS, containerWidth)}
+                      enableResizing={
+                        !readOnly && showEditControls && !isSingleColumn
+                          ? {
+                              top: false,
+                              right: true,
+                              bottom: block.block_type !== 'text',
+                              left: true,
+                              topRight: false,
+                              bottomRight: false,
+                              bottomLeft: false,
+                              topLeft: false,
+                            }
+                          : false
+                      }
+                      disableDragging={readOnly || !showEditControls}
+                      onDragStart={() => {
+                        setDraggingBlockId(block.id);
+                      }}
+                      onDrag={(event, data) => {
+                        if (readOnly || !showEditControls) return;
+                        const container = containerRef.current;
+                        if (!container) return;
+                        const rect = container.getBoundingClientRect();
+                        const pointerSource: any =
+                          'touches' in event && event.touches?.length
+                            ? event.touches[0]
+                            : 'changedTouches' in event && event.changedTouches?.length
+                              ? event.changedTouches[0]
+                              : event;
+                        const pointerX = pointerSource.clientX - rect.left;
+                        const pointerY = pointerSource.clientY - rect.top;
+
+                        setBlocksTransient((prev) => {
+                          const active = prev.find((b) => b.id === block.id);
+                          if (!active) return prev;
+                          const dragW = active.layout.w;
+                          const dragH = getBlockHeightPx(active, dragW);
+                          const nextXRaw = pxToGridX(data.x, containerWidth);
+                          const nextX = isSingleColumn ? 0 : clampGridX(nextXRaw, dragW);
+                          let nextY = Math.max(0, data.y);
+
+                          const hovered = prev.find((b) => {
+                            if (b.id === active.id) return false;
+                            const bX = isSingleColumn ? 0 : gridToPxX(b.layout.x, containerWidth);
+                            const bW = isSingleColumn
+                              ? containerWidth
+                              : gridToPxW(b.layout.w, containerWidth);
+                            const bH = getBlockHeightPx(b);
+                            const bY = b.layout.y;
+                            return (
+                              pointerX >= bX &&
+                              pointerX <= bX + bW &&
+                              pointerY >= bY &&
+                              pointerY <= bY + bH
+                            );
+                          });
+
+                          if (hovered) {
+                            const hoveredH = getBlockHeightPx(hovered);
+                            const hoveredMid = hovered.layout.y + hoveredH / 2;
+                            if (pointerY < hoveredMid) {
+                              nextY = Math.max(0, hovered.layout.y - dragH - GRID_GAP);
+                            } else {
+                              nextY = hovered.layout.y + hoveredH + GRID_GAP;
+                            }
+                          }
+
+                          const next = prev.map((b) =>
+                            b.id === active.id ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } } : b
+                          );
+                          const resolved = resolveAllOverlaps(next, active.id);
+                          return compactVertical(resolved, active.id);
+                        });
+                      }}
+                      onDragStop={(event, data) => {
+                        setDraggingBlockId(null);
+                        const nextXRaw = pxToGridX(data.x, containerWidth);
+                        const nextX = isSingleColumn ? 0 : clampGridX(nextXRaw, block.layout.w);
+                        let nextY = Math.max(0, data.y);
+                        const container = containerRef.current;
+                        if (container) {
+                          const rect = container.getBoundingClientRect();
+                          const pointerSource: any =
+                            'touches' in event && event.touches?.length
+                              ? event.touches[0]
+                              : 'changedTouches' in event && event.changedTouches?.length
+                                ? event.changedTouches[0]
+                                : event;
+                          const pointerX = pointerSource.clientX - rect.left;
+                          const pointerY = pointerSource.clientY - rect.top;
+                          const hovered = blocks.find((b) => {
+                            if (b.id === block.id) return false;
+                            const bX = isSingleColumn ? 0 : gridToPxX(b.layout.x, containerWidth);
+                            const bW = isSingleColumn
+                              ? containerWidth
+                              : gridToPxW(b.layout.w, containerWidth);
+                            const bH = getBlockHeightPx(b);
+                            const bY = b.layout.y;
+                            return (
+                              pointerX >= bX &&
+                              pointerX <= bX + bW &&
+                              pointerY >= bY &&
+                              pointerY <= bY + bH
+                            );
+                          });
+                          if (hovered) {
+                            const dragH = getBlockHeightPx(block, block.layout.w);
+                            const hoveredH = getBlockHeightPx(hovered);
+                            const hoveredMid = hovered.layout.y + hoveredH / 2;
+                            if (pointerY < hoveredMid) {
+                              nextY = Math.max(0, hovered.layout.y - dragH - GRID_GAP);
+                            } else {
+                              nextY = hovered.layout.y + hoveredH + GRID_GAP;
+                            }
+                          }
+                        }
+                        setBlocks((prev) => {
+                          const next = prev.map((b) =>
+                            b.id === block.id
+                              ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
+                              : b
+                          );
+                          const resolved = resolveAllOverlaps(next, block.id);
+                          const compacted = compactVertical(resolved, block.id);
+                          return layoutMode === 'snap' ? packMasonry(compacted) : compacted;
+                        });
+                      }}
+                      onResizeStop={(_, __, ref, _delta, position) => {
+                        const nextWidthPx = ref.offsetWidth;
+                        const fullWidthPx = gridToPxW(GRID_COLS, containerWidth);
+                        let nextW = pxToGridW(nextWidthPx, containerWidth);
+                        const nextH = ratio
+                          ? ratioToPxH(nextW, ratio, containerWidth)
+                          : Math.max(80, ref.offsetHeight);
+                        const nextXRaw = pxToGridX(position.x, containerWidth);
+                        let nextX = clampGridX(nextXRaw, nextW);
+                        const shouldSnapFullWidth = block.block_type === 'image';
+                        if (isSingleColumn) {
+                          nextW = GRID_COLS;
+                          nextX = 0;
+                        }
+                        if (
+                          !isSingleColumn &&
+                          shouldSnapFullWidth &&
+                          (position.x + nextWidthPx >= fullWidthPx - 1 ||
+                            (nextX === 0 && nextW >= GRID_COLS - 1))
+                        ) {
+                          nextW = GRID_COLS;
+                          nextX = 0;
+                        }
+                        const nextY = Math.max(0, position.y);
+
+                        setBlocks((prev) => {
+                          const next = prev.map((b) =>
+                            b.id === block.id
+                              ? {
+                                  ...b,
+                                  layout: {
+                                    ...b.layout,
+                                    w: nextW,
+                                    h: nextH,
+                                    x: nextX,
+                                    y: nextY,
+                                  },
+                                }
+                              : b
+                          );
+                          return layoutMode === 'snap' ? packMasonry(next) : next;
+                        });
+                      }}
+                    >
+                      <div
+                        dir="ltr"
+                        className={`relative rounded-lg overflow-hidden group w-full h-full ${
+                          block.block_type === 'vimeo' ? 'bg-black' : 'bg-gray-100'
+                        }`}
+                        onDragOver={(event) => {
+                          if (block.block_type === 'image') {
+                            event.preventDefault();
+                          }
+                        }}
+                        onDrop={(event) => {
+                          if (block.block_type !== 'image') return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const file = event.dataTransfer?.files?.[0];
+                          if (file) {
+                            handleUploadToBlock(block, file);
+                          }
+                        }}
                       >
-                        {project.title}
-                      </Link>
-                      {firstBlock ? (
-                        isVimeo ? (
-                          <div className="rounded-lg overflow-hidden bg-black">
-                            <BlockRenderer block={firstBlock} />
-                          </div>
-                        ) : (
-                          <Link href={`/${project.slug}`} className="block rounded-lg overflow-hidden bg-black">
-                            <BlockRenderer block={firstBlock} />
-                          </Link>
-                        )
-                      ) : (
-                        <div className="rounded-lg bg-white/5 text-white/60 text-sm p-6">
-                          No preview yet
-                        </div>
-                      )}
-                    </div>
+                        <BlockRenderer
+                          block={block}
+                          isEditing={!readOnly && showEditControls}
+                          onHeaderChange={handleUpdateHeaderField}
+                          onTextChange={handleUpdateTextField}
+                        />
+                        {!readOnly && showEditControls && (
+                          <>
+                            {block.block_type === 'vimeo' ? (
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 flex flex-col gap-2 z-30">
+                                <input
+                                  type="text"
+                                  placeholder="Vimeo ID"
+                                  value={(block.content as any)?.vimeo_id || ''}
+                                  onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Title"
+                                  value={(block.content as any)?.title || ''}
+                                  onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Caption"
+                                  value={(block.content as any)?.caption || ''}
+                                  onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                                />
+                                <div className="flex justify-end gap-2 pt-1">
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteBlock(block.id);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : block.block_type === 'image' ? (
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex flex-col gap-2 pointer-events-none">
+                                <div className="flex gap-2 pointer-events-auto justify-end">
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSelectExisting(block);
+                                    }}
+                                    className="bg-white text-black hover:bg-gray-100"
+                                  >
+                                    Existing
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteBlock(block.id);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                                <div className="flex flex-col gap-2 pointer-events-auto">
+                                  <input
+                                    type="text"
+                                    placeholder="Alt text"
+                                    value={(block.content as any)?.alt || ''}
+                                    onChange={(e) => {
+                                      const content = block.content as { url?: string; alt?: string; caption?: string };
+                                      handleSaveBlock({
+                                        ...block,
+                                        content: {
+                                          ...content,
+                                          url: content.url || '',
+                                          alt: e.target.value,
+                                        },
+                                      });
+                                    }}
+                                    className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Caption"
+                                    value={(block.content as any)?.caption || ''}
+                                    onChange={(e) => {
+                                      const content = block.content as { url?: string; alt?: string; caption?: string };
+                                      handleSaveBlock({
+                                        ...block,
+                                        content: {
+                                          ...content,
+                                          url: content.url || '',
+                                          caption: e.target.value,
+                                        },
+                                      });
+                                    }}
+                                    className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
+                                  />
+                                </div>
+                              </div>
+                            ) : block.block_type === 'header' ? (
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
+                                <div className="flex gap-2 pointer-events-auto">
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteBlock(block.id);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : block.block_type === 'text' ? (
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
+                                <div className="flex gap-2 pointer-events-auto">
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteBlock(block.id);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                    </Rnd>
                   );
                 })}
               </div>
             )}
-          </section>
-        )}
-      </main>
 
-      {/* Site footer - same as front end */}
-      <SiteFooter />
+            {(page.slug === 'home' || page.slug === 'projects') && (
+              <section className="pb-24">
+                {page.slug === 'home' && (
+                  <div className="mb-6">
+                    <h2 className="text-2xl md:text-3xl font-light tracking-tight">Projects</h2>
+                  </div>
+                )}
+                {projectPreviews.length === 0 ? (
+                  <p className="text-white/60 text-sm">No projects yet.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {projectPreviews.map((project) => {
+                      const firstBlock = project.first_block;
+                      const isVimeo = firstBlock?.block_type === 'vimeo';
+
+                      return (
+                        <div key={project.id} className="group">
+                          <Link
+                            href={`/${project.slug}`}
+                            className="mb-3 text-lg font-light inline-flex text-white hover:text-white/90"
+                          >
+                            {project.title}
+                          </Link>
+                          {firstBlock ? (
+                            isVimeo ? (
+                              <div className="rounded-lg overflow-hidden bg-black">
+                                <BlockRenderer block={firstBlock} />
+                              </div>
+                            ) : (
+                              <Link href={`/${project.slug}`} className="block rounded-lg overflow-hidden bg-black">
+                                <BlockRenderer block={firstBlock} />
+                              </Link>
+                            )
+                          ) : (
+                            <div className="rounded-lg bg-white/5 text-white/60 text-sm p-6">
+                              No preview yet
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
+        }
+      />
 
       {/* Image sizes are measured via Image() loader */}
 
