@@ -89,3 +89,58 @@ export async function PUT(
 
   return NextResponse.json(data);
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const url = new URL(request.url);
+  const draftMode = url.searchParams.get('draft') === '1';
+  
+  // Check authentication
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Don't allow deleting reserved pages
+  const reservedSlugs = ['home', 'about', 'projects'];
+  if (reservedSlugs.includes(slug)) {
+    return NextResponse.json({ error: 'Cannot delete reserved pages' }, { status: 400 });
+  }
+
+  // First get the page to get its ID
+  const { data: page, error: pageError } = await supabase
+    .from(draftMode ? 'pages_drafts' : 'pages')
+    .select('id')
+    .eq('slug', slug)
+    .single();
+
+  if (pageError) {
+    return NextResponse.json({ error: pageError.message }, { status: 404 });
+  }
+
+  // Delete associated content blocks first
+  const { error: blocksError } = await supabase
+    .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
+    .delete()
+    .eq(draftMode ? 'page_draft_id' : 'page_id', page.id);
+
+  if (blocksError) {
+    return NextResponse.json({ error: blocksError.message }, { status: 500 });
+  }
+
+  // Delete the page
+  const { error: deleteError } = await supabase
+    .from(draftMode ? 'pages_drafts' : 'pages')
+    .delete()
+    .eq('slug', slug);
+
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}

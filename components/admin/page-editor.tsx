@@ -829,6 +829,27 @@ export function PageEditor({
     }
   }, [title, description, draftMode]);
 
+  const handleDeletePage = useCallback(async () => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`);
+    if (!confirmed) return;
+    
+    try {
+      const response = await fetch(`/api/pages/${page.slug}${draftMode ? '?draft=1' : ''}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        console.error('Failed to delete page');
+        return;
+      }
+
+      // Navigate to home after deletion
+      router.push('/home?edit=1');
+    } catch (error) {
+      console.error('Failed to delete page:', error);
+    }
+  }, [title, page.slug, draftMode, router]);
+
   const handleEditBlock = useCallback((block: ContentBlock) => {
     setEditorInitialTab('upload');
     setEditingBlock(block);
@@ -1130,8 +1151,8 @@ export function PageEditor({
                     .map((option) => (
                       <DropdownMenuItem
                         key={option.id}
-                        onClick={() => router.push(`/${option.slug}?edit=1`)}
-                        className={option.slug === page.slug ? 'bg-white/10' : ''}
+                        onSelect={() => router.push(`/${option.slug}?edit=1`)}
+                        className={`cursor-pointer ${option.slug === page.slug ? 'bg-white/10' : ''}`}
                       >
                         {option.title}
                       </DropdownMenuItem>
@@ -1142,8 +1163,8 @@ export function PageEditor({
                     .map((option) => (
                       <DropdownMenuItem
                         key={option.id}
-                        onClick={() => router.push(`/${option.slug}?edit=1`)}
-                        className={option.slug === page.slug ? 'bg-white/10' : ''}
+                        onSelect={() => router.push(`/${option.slug}?edit=1`)}
+                        className={`cursor-pointer ${option.slug === page.slug ? 'bg-white/10' : ''}`}
                       >
                         {option.title}
                       </DropdownMenuItem>
@@ -1211,6 +1232,14 @@ export function PageEditor({
                 className="border-red-600 text-red-300 hover:bg-red-900/30"
               >
                 Clear Blocks
+              </Button>
+              <Button
+                onClick={handleDeletePage}
+                variant="outline"
+                size="sm"
+                className="border-red-600 text-red-300 hover:bg-red-900/30"
+              >
+                Delete Page
               </Button>
               <div className="flex items-center gap-1 ml-2">
                 <Button
