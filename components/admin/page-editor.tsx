@@ -1630,6 +1630,7 @@ export function PageEditor({
                         setBlocksTransient((prev) => {
                           const active = prev.find((b) => b.id === block.id);
                           if (!active) return prev;
+                          const isTextBlock = active.block_type === 'text';
                           const dragW = active.layout.w;
                           const dragH = getBlockHeightPx(active, dragW);
                           const nextXRaw = pxToGridX(data.x, containerWidth);
@@ -1665,6 +1666,9 @@ export function PageEditor({
                           const next = prev.map((b) =>
                             b.id === active.id ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } } : b
                           );
+                          if (isTextBlock) {
+                            return next;
+                          }
                           const resolved = resolveAllOverlaps(next, active.id);
                           return compactVertical(resolved, active.id);
                         });
@@ -1717,6 +1721,9 @@ export function PageEditor({
                               ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
                               : b
                           );
+                          if (block.block_type === 'text') {
+                            return next;
+                          }
                           const resolved = resolveAllOverlaps(next, block.id);
                           const compacted = compactVertical(resolved, block.id);
                           return layoutMode === 'snap' ? packMasonry(compacted) : compacted;
