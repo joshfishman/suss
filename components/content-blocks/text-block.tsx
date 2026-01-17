@@ -5,32 +5,52 @@ import { TextContent } from '@/lib/types/content';
 interface TextBlockProps {
   content: TextContent;
   isEditing?: boolean;
+  onChange?: (content: TextContent) => void;
 }
 
-export function TextBlock({ content, isEditing = false }: TextBlockProps) {
-  const getClassName = () => {
-    switch (content.style) {
-      case 'heading':
-        return 'text-3xl md:text-5xl font-bold text-white';
-      case 'caption':
-        return 'text-sm md:text-base text-white/70';
-      default:
-        return 'text-base md:text-lg text-white';
-    }
-  };
-
+export function TextBlock({ content, isEditing = false, onChange }: TextBlockProps) {
   return (
     <div
-      className="relative w-full h-full flex items-center justify-start px-0 py-4 bg-black"
+      className="relative w-full h-full flex flex-col justify-center p-6 bg-black text-white"
       dir="ltr"
       style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
     >
-      <div
+      <h3
         dir="ltr"
-        className={`${getClassName()} w-full`}
+        contentEditable={isEditing}
+        suppressContentEditableWarning
+        onInput={(e) => {
+          if (!onChange) return;
+          onChange({
+            ...content,
+            header: e.currentTarget.textContent || '',
+          });
+        }}
+        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2"
         style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
-        dangerouslySetInnerHTML={{ __html: `<div dir="ltr" style="direction:ltr;text-align:left;unicode-bidi:isolate">${content.html}</div>` }}
-      />
+        data-placeholder="Header"
+      >
+        {content.header || ''}
+      </h3>
+      {content.description || isEditing ? (
+        <p
+          dir="ltr"
+          contentEditable={isEditing}
+          suppressContentEditableWarning
+          onInput={(e) => {
+            if (!onChange) return;
+            onChange({
+              ...content,
+              description: e.currentTarget.textContent || '',
+            });
+          }}
+          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2"
+          style={{ direction: 'ltr', textAlign: 'left', unicodeBidi: 'isolate' }}
+          data-placeholder="Description"
+        >
+          {content.description || ''}
+        </p>
+      ) : null}
       {isEditing && (
         <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
           Text

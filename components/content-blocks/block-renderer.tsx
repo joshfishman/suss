@@ -10,16 +10,23 @@ interface BlockRendererProps {
   block: ContentBlock;
   isEditing?: boolean;
   onHeaderChange?: (blockId: string, content: HeaderContent) => void;
+  onTextChange?: (blockId: string, content: TextContent) => void;
 }
 
-export function BlockRenderer({ block, isEditing = false, onHeaderChange }: BlockRendererProps) {
+export function BlockRenderer({ block, isEditing = false, onHeaderChange, onTextChange }: BlockRendererProps) {
   switch (block.block_type) {
     case 'image':
       return <ImageBlock content={block.content as ImageContent} isEditing={isEditing} />;
     case 'vimeo':
       return <VimeoBlock content={block.content as VimeoContent} isEditing={isEditing} />;
     case 'text':
-      return <TextBlock content={block.content as TextContent} isEditing={isEditing} />;
+      return (
+        <TextBlock
+          content={block.content as TextContent}
+          isEditing={isEditing}
+          onChange={(content) => onTextChange?.(block.id, content)}
+        />
+      );
     case 'header':
       return (
         <HeaderBlock

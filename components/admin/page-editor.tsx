@@ -774,9 +774,7 @@ export function PageEditor({
           ? { url: '', alt: '', caption: '' }
           : type === 'vimeo'
             ? { vimeo_id: '', title: '', caption: '' }
-            : type === 'text'
-              ? { html: '', style: 'paragraph' }
-              : { header: '', description: '' },
+            : { header: '', description: '' },
       layout: {
         i: blockId,
         x: nextX,
@@ -902,6 +900,21 @@ export function PageEditor({
     setBlocks((prev) =>
       prev.map((block) => {
         if (block.id !== blockId || block.block_type !== 'header') return block;
+        return {
+          ...block,
+          content: {
+            header: content.header,
+            description: content.description,
+          },
+        };
+      })
+    );
+  }, []);
+
+  const handleUpdateTextField = useCallback((blockId: string, content: { header: string; description: string }) => {
+    setBlocks((prev) =>
+      prev.map((block) => {
+        if (block.id !== blockId || block.block_type !== 'text') return block;
         return {
           ...block,
           content: {
@@ -1405,6 +1418,7 @@ export function PageEditor({
                       block={block}
                       isEditing={!readOnly && showEditControls}
                       onHeaderChange={handleUpdateHeaderField}
+                      onTextChange={handleUpdateTextField}
                     />
                     {!readOnly && showEditControls && (
                       <>
@@ -1522,19 +1536,8 @@ export function PageEditor({
                             </div>
                           </div>
                         ) : block.block_type === 'text' ? (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end gap-2 pointer-events-none">
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
                             <div className="flex gap-2 pointer-events-auto">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditBlock(block);
-                                }}
-                                className="bg-white text-black hover:bg-gray-100"
-                              >
-                                Edit
-                              </Button>
                               <Button
                                 size="sm"
                                 variant="destructive"

@@ -32,8 +32,8 @@ export interface VimeoContent {
 }
 
 export interface TextContent {
-  html: string;
-  style?: 'heading' | 'paragraph' | 'caption';
+  header: string;
+  description: string;
 }
 
 export interface HeaderContent {
