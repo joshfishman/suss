@@ -207,26 +207,22 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
         return (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="html" className="text-white">Content</Label>
-              <textarea
-                id="html"
-                value={textContent.html}
-                onChange={(e) => setContent({ ...textContent, html: e.target.value })}
-                className="w-full min-h-[200px] p-2 border border-gray-600 rounded-md bg-gray-700 text-white"
+              <Label htmlFor="header" className="text-white">Header</Label>
+              <Input
+                id="header"
+                value={textContent.header || ''}
+                onChange={(e) => setContent({ ...textContent, header: e.target.value })}
+                className="bg-gray-700 border-gray-600 text-white"
               />
             </div>
             <div>
-              <Label htmlFor="style" className="text-white">Style</Label>
-              <select
-                id="style"
-                value={textContent.style || 'paragraph'}
-                onChange={(e) => setContent({ ...textContent, style: e.target.value as any })}
-                className="w-full p-2 border border-gray-600 rounded-md bg-gray-700 text-white"
-              >
-                <option value="heading">Heading</option>
-                <option value="paragraph">Paragraph</option>
-                <option value="caption">Caption</option>
-              </select>
+              <Label htmlFor="description" className="text-white">Description</Label>
+              <textarea
+                id="description"
+                value={textContent.description || ''}
+                onChange={(e) => setContent({ ...textContent, description: e.target.value })}
+                className="w-full min-h-[200px] p-2 border border-gray-600 rounded-md bg-gray-700 text-white"
+              />
             </div>
           </div>
         );
