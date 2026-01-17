@@ -173,5 +173,4 @@ html, body {
 input, textarea, [contenteditable] {
   direction: ltr !important;
   text-align: left !important;
-  unicode-bidi: bidi-override !important;
 }
