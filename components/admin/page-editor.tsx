@@ -228,7 +228,7 @@ export function PageEditor({
   }, [readOnly, urlEditMode]);
 
   useEffect(() => {
-    if (page.slug !== 'home') return;
+    if (page.slug !== 'home' && page.slug !== 'projects') return;
     let cancelled = false;
     const loadProjects = async () => {
       try {
@@ -1653,11 +1653,13 @@ export function PageEditor({
         )}
         </div>
 
-        {page.slug === 'home' && (
+        {(page.slug === 'home' || page.slug === 'projects') && (
           <section className="container mx-auto px-8 pb-24">
-            <div className="mb-6">
-              <h2 className="text-2xl md:text-3xl font-light tracking-tight">Projects</h2>
-            </div>
+            {page.slug === 'home' && (
+              <div className="mb-6">
+                <h2 className="text-2xl md:text-3xl font-light tracking-tight">Projects</h2>
+              </div>
+            )}
             {projectPreviews.length === 0 ? (
               <p className="text-white/60 text-sm">No projects yet.</p>
             ) : (
