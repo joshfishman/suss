@@ -1581,7 +1581,8 @@ export function PageEditor({
                       position={{ x: xPx, y: yPx }}
                       lockAspectRatio={ratio ?? false}
                       style={{
-                        zIndex: draggingBlockId === block.id ? 50 : 1,
+                        zIndex:
+                          draggingBlockId === block.id ? 50 : Math.max(1, 10000 - Math.round(yPx)),
                       }}
                       dragGrid={
                         !isSingleColumn && layoutMode === 'snap'
