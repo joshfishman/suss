@@ -1,3 +1,5 @@
+'use client';
+
 import { HeaderContent } from '@/lib/types/content';
 
 interface HeaderBlockProps {

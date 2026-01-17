@@ -1,3 +1,5 @@
+'use client';
+
 import { TextContent } from '@/lib/types/content';
 
 interface TextBlockProps {
