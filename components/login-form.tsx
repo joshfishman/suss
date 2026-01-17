@@ -77,7 +77,7 @@ export function LoginForm({
                     href="/auth/forgot-password"
                     className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
                   >
-                    Forgot your password?
+                    Reset password
                   </Link>
                 </div>
                 <Input
@@ -95,11 +95,12 @@ export function LoginForm({
             </div>
             <div className="mt-4 text-center text-sm">
               Don&apos;t have an account?{" "}
-              <Link
-                href="/auth/sign-up"
-                className="underline underline-offset-4"
-              >
+              <Link href="/auth/sign-up" className="underline underline-offset-4">
                 Sign up
+              </Link>
+              <span className="mx-2 text-muted-foreground">•</span>
+              <Link href="/auth/forgot-password" className="underline underline-offset-4">
+                Reset password
               </Link>
             </div>
           </form>
