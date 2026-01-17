@@ -69,11 +69,11 @@ export function GridEditor({ pageId, initialBlocks, onSave }: GridEditorProps) {
       id: `temp-${Date.now()}`,
       page_id: pageId,
       block_type: type,
-      content: type === 'image' 
+      content: type === 'image'
         ? { url: '', alt: '', caption: '' }
         : type === 'vimeo'
-        ? { vimeo_id: '', title: '', caption: '' }
-        : { html: 'New Text Block', style: 'paragraph' },
+          ? { vimeo_id: '', title: '', caption: '' }
+          : { header: '', description: '' },
       layout: {
         i: `block-${Date.now()}`,
         x: 0,
