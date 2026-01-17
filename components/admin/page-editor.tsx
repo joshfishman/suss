@@ -1031,6 +1031,30 @@ export function PageEditor({
     }
   }, [router]);
 
+  const handleCreatePage = useCallback(async () => {
+    const title = window.prompt('Page title');
+    if (!title) return;
+    const slug = title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    try {
+      const response = await fetch('/api/admin/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, slug, page_type: 'page' }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create page');
+      }
+      router.push(`/${data.slug}?edit=1`);
+    } catch (error) {
+      console.error('Failed to create page:', error);
+    }
+  }, [router]);
+
   // Handle file drop for images
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setIsDraggingFile(false);
@@ -1156,32 +1180,32 @@ export function PageEditor({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black text-white border-white/10 min-w-[200px]">
-                  <div className="px-2 py-1.5 text-xs text-white/50 uppercase tracking-wider">Pages</div>
-                  {pageOptions
-                    .filter((opt) => opt.page_type !== 'project')
-                    .map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => router.push(`/${option.slug}?edit=1`)}
-                        className={`w-full text-left px-2 py-1.5 text-sm cursor-pointer hover:bg-white/10 rounded ${option.slug === page.slug ? 'bg-white/10' : ''}`}
-                      >
-                        {option.title}
-                      </button>
-                    ))}
-                  <div className="px-2 py-1.5 text-xs text-white/50 uppercase tracking-wider mt-2">Projects</div>
-                  {pageOptions
-                    .filter((opt) => opt.page_type === 'project')
-                    .map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => router.push(`/${option.slug}?edit=1`)}
-                        className={`w-full text-left px-2 py-1.5 text-sm cursor-pointer hover:bg-white/10 rounded ${option.slug === page.slug ? 'bg-white/10' : ''}`}
-                      >
-                        {option.title}
-                      </button>
-                    ))}
+                  {pageOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => router.push(`/${option.slug}?edit=1`)}
+                      className={`w-full text-left px-2 py-1.5 text-sm cursor-pointer hover:bg-white/10 rounded ${option.slug === page.slug ? 'bg-white/10' : ''}`}
+                    >
+                      {option.title}
+                    </button>
+                  ))}
+                  <div className="border-t border-white/10 mt-2 pt-2 flex gap-2 px-2 pb-2">
+                    <button
+                      type="button"
+                      onClick={handleCreatePage}
+                      className="flex-1 text-xs px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded cursor-pointer"
+                    >
+                      + Page
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateProject}
+                      className="flex-1 text-xs px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded cursor-pointer"
+                    >
+                      + Project
+                    </button>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
               {/* Editable title input */}
@@ -1220,14 +1244,6 @@ export function PageEditor({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button
-                onClick={handleCreateProject}
-                variant="outline"
-                size="sm"
-                className="border-gray-600 text-white hover:bg-gray-800"
-              >
-                New Project
-              </Button>
               {draftMode && (
                 <Button
                   onClick={handlePublish}
