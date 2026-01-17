@@ -8,6 +8,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  type PageRow = { id: any; slug: any; title: any; page_type?: any | null };
+
   let { data, error } = await supabase
     .from('pages')
     .select('id, slug, title, page_type')
@@ -19,7 +21,7 @@ export async function GET() {
       .from('pages')
       .select('id, slug, title')
       .order('created_at', { ascending: true });
-    data = fallback.data;
+    data = (fallback.data || []).map((page) => ({ ...page, page_type: null })) as PageRow[];
     error = fallback.error;
   }
 
@@ -28,7 +30,7 @@ export async function GET() {
   }
 
   // Infer page_type from slug if not present
-  const pages = (data || []).map((page) => ({
+  const pages = ((data as PageRow[] | null) || []).map((page) => ({
     ...page,
     page_type: page.page_type || (page.slug?.startsWith('project-') ? 'project' : 'page'),
   }));
