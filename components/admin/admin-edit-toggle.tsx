@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -9,7 +9,6 @@ export function AdminEditToggle() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
   const editMode = searchParams.get("edit") === "1";
 
@@ -37,15 +36,10 @@ export function AdminEditToggle() {
     <button
       type="button"
       onClick={() => {
-        startTransition(() => {
-          router.replace(toggleHref);
-          setTimeout(() => {
-            router.refresh();
-          }, 50);
-        });
+        // Push immediately - toolbar will appear via URL param detection
+        router.push(toggleHref);
       }}
-      disabled={isPending}
-      className="text-xs font-light tracking-wide uppercase border border-white/40 px-3 py-1 rounded-full text-white hover:border-white disabled:opacity-60"
+      className="text-xs font-light tracking-wide uppercase border border-white/40 px-3 py-1 rounded-full text-white hover:border-white"
     >
       {editMode ? "Exit Edit" : "Edit"}
     </button>

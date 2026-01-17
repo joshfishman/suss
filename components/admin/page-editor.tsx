@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { Rnd } from 'react-rnd';
 import { Page, ContentBlock, LayoutMode } from '@/lib/types/content';
@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Trash2, Edit, Video, Image as ImageIcon, Check, Loader2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Trash2, Video, Image as ImageIcon, Check, Loader2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
@@ -118,6 +118,9 @@ export function PageEditor({
   readOnly = false,
 }: PageEditorProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Check URL for edit param to show toolbar immediately (before server re-renders)
+  const urlEditMode = searchParams.get('edit') === '1' || searchParams.get('edit') === 'true';
   const [blocks, setBlocks] = useState<ContentBlock[]>(() => normalizeInitialBlocks(initialBlocks));
   const [title, setTitle] = useState(page.title);
   const [heroTitle, setHeroTitle] = useState(page.hero_title || page.title);
@@ -134,7 +137,8 @@ export function PageEditor({
     { id: string; slug: string; title: string; page_type?: string }[]
   >([]);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [showEditControls, setShowEditControls] = useState(!readOnly);
+  // Show edit controls if URL has edit param OR if not readOnly
+  const [showEditControls, setShowEditControls] = useState(!readOnly || urlEditMode);
   const [activeUploadBlockId, setActiveUploadBlockId] = useState<string | null>(null);
   const [editorInitialTab, setEditorInitialTab] = useState<'upload' | 'existing'>('upload');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -164,6 +168,17 @@ export function PageEditor({
   const measuredSizesRef = useRef<Record<string, { width: number; height: number }>>({});
   const lastImageUrlByLayoutRef = useRef<Record<string, string>>({});
   const imageRatioRef = useRef<Record<string, number>>({});
+
+  // Sync edit controls with URL param changes (for instant toolbar appearance)
+  useEffect(() => {
+    if (urlEditMode && !showEditControls) {
+      setShowEditControls(true);
+    } else if (!urlEditMode && !readOnly && showEditControls) {
+      // Keep showing if not readOnly
+    } else if (!urlEditMode && readOnly) {
+      setShowEditControls(false);
+    }
+  }, [urlEditMode, readOnly, showEditControls]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -1097,34 +1112,51 @@ export function PageEditor({
                   {editOnPublic ? 'Exit' : 'Back'}
                 </Button>
               </Link>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400">Page Title</span>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="h-8 w-48 bg-black border-white/20 text-white text-sm"
-                  />
-                </div>
-                {pageOptions.length > 0 && (
-                  <select
-                    value={page.slug}
-                    onChange={(e) => {
-                      const nextSlug = e.target.value;
-                      if (nextSlug && nextSlug !== page.slug) {
-                        router.push(`/${nextSlug}?edit=1`);
-                      }
-                    }}
-                    className="h-8 w-56 bg-black border border-white/20 text-white text-xs rounded px-2"
+              {/* Page switcher dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-colors"
                   >
-                    {pageOptions.map((option) => (
-                      <option key={option.id} value={option.slug}>
-                        {option.title} {option.page_type === 'project' ? '(Project)' : ''}
-                      </option>
+                    <span className="text-lg font-light">{title || page.title}</span>
+                    <ChevronDown className="w-4 h-4 text-white/60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-black text-white border-white/10 min-w-[200px]">
+                  <div className="px-2 py-1.5 text-xs text-white/50 uppercase tracking-wider">Pages</div>
+                  {pageOptions
+                    .filter((opt) => opt.page_type !== 'project')
+                    .map((option) => (
+                      <DropdownMenuItem
+                        key={option.id}
+                        onClick={() => router.push(`/${option.slug}?edit=1`)}
+                        className={option.slug === page.slug ? 'bg-white/10' : ''}
+                      >
+                        {option.title}
+                      </DropdownMenuItem>
                     ))}
-                  </select>
-                )}
-              </div>
+                  <div className="px-2 py-1.5 text-xs text-white/50 uppercase tracking-wider mt-2">Projects</div>
+                  {pageOptions
+                    .filter((opt) => opt.page_type === 'project')
+                    .map((option) => (
+                      <DropdownMenuItem
+                        key={option.id}
+                        onClick={() => router.push(`/${option.slug}?edit=1`)}
+                        className={option.slug === page.slug ? 'bg-white/10' : ''}
+                      >
+                        {option.title}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Editable title input */}
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Page title..."
+                className="h-8 w-40 bg-black border-white/20 text-white text-sm"
+              />
             </div>
             
             <div className="flex items-center gap-2">
