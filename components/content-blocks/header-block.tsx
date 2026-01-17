@@ -18,7 +18,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
         dir="ltr"
         contentEditable={isEditing}
         suppressContentEditableWarning
-        onInput={(e) => {
+        onBlur={(e) => {
           if (!onChange) return;
           onChange({
             ...content,
@@ -35,7 +35,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
           dir="ltr"
           contentEditable={isEditing}
           suppressContentEditableWarning
-          onInput={(e) => {
+          onBlur={(e) => {
             if (!onChange) return;
             onChange({
               ...content,
