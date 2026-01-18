@@ -1582,7 +1582,7 @@ export function PageEditor({
                       lockAspectRatio={ratio ?? false}
                       style={{
                         zIndex:
-                          draggingBlockId === block.id ? 100000 : Math.max(1, 10000 - Math.round(yPx)),
+                          draggingBlockId === block.id ? 60 : Math.max(1, 40 - Math.round(yPx / 10)),
                       }}
                       dragGrid={
                         !isSingleColumn && layoutMode === 'snap'
@@ -1614,117 +1614,18 @@ export function PageEditor({
                       onDragStart={() => {
                         setDraggingBlockId(block.id);
                       }}
-                      onDrag={(event, data) => {
-                        if (readOnly || !showEditControls) return;
-                        const container = containerRef.current;
-                        if (!container) return;
-                        const rect = container.getBoundingClientRect();
-                        const pointerSource: any =
-                          'touches' in event && event.touches?.length
-                            ? event.touches[0]
-                            : 'changedTouches' in event && event.changedTouches?.length
-                              ? event.changedTouches[0]
-                              : event;
-                        const pointerX = pointerSource.clientX - rect.left;
-                        const pointerY = pointerSource.clientY - rect.top;
-
-                        setBlocksTransient((prev) => {
-                          const active = prev.find((b) => b.id === block.id);
-                          if (!active) return prev;
-                          const isTextBlock = active.block_type === 'text';
-                          const dragW = active.layout.w;
-                          const dragH = getBlockHeightPx(active, dragW);
-                          const nextXRaw = pxToGridX(data.x, containerWidth);
-                          const nextX = isSingleColumn ? 0 : clampGridX(nextXRaw, dragW);
-                          let nextY = Math.max(0, data.y);
-
-                          const hovered = prev.find((b) => {
-                            if (b.id === active.id) return false;
-                            const bX = isSingleColumn ? 0 : gridToPxX(b.layout.x, containerWidth);
-                            const bW = isSingleColumn
-                              ? containerWidth
-                              : gridToPxW(b.layout.w, containerWidth);
-                            const bH = getBlockHeightPx(b);
-                            const bY = b.layout.y;
-                            return (
-                              pointerX >= bX &&
-                              pointerX <= bX + bW &&
-                              pointerY >= bY &&
-                              pointerY <= bY + bH
-                            );
-                          });
-
-                          if (hovered) {
-                            const hoveredH = getBlockHeightPx(hovered);
-                            const hoveredMid = hovered.layout.y + hoveredH / 2;
-                            if (pointerY < hoveredMid) {
-                              nextY = Math.max(0, hovered.layout.y - dragH - GRID_GAP);
-                            } else {
-                              nextY = hovered.layout.y + hoveredH + GRID_GAP;
-                            }
-                          }
-
-                          const next = prev.map((b) =>
-                            b.id === active.id ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } } : b
-                          );
-                          if (isTextBlock) {
-                            return next;
-                          }
-                          const resolved = resolveAllOverlaps(next, active.id);
-                          return compactVertical(resolved, active.id);
-                        });
-                      }}
-                      onDragStop={(event, data) => {
+                      onDragStop={(_, data) => {
                         setDraggingBlockId(null);
                         const nextXRaw = pxToGridX(data.x, containerWidth);
                         const nextX = isSingleColumn ? 0 : clampGridX(nextXRaw, block.layout.w);
-                        let nextY = Math.max(0, data.y);
-                        const container = containerRef.current;
-                        if (container) {
-                          const rect = container.getBoundingClientRect();
-                          const pointerSource: any =
-                            'touches' in event && event.touches?.length
-                              ? event.touches[0]
-                              : 'changedTouches' in event && event.changedTouches?.length
-                                ? event.changedTouches[0]
-                                : event;
-                          const pointerX = pointerSource.clientX - rect.left;
-                          const pointerY = pointerSource.clientY - rect.top;
-                          const hovered = blocks.find((b) => {
-                            if (b.id === block.id) return false;
-                            const bX = isSingleColumn ? 0 : gridToPxX(b.layout.x, containerWidth);
-                            const bW = isSingleColumn
-                              ? containerWidth
-                              : gridToPxW(b.layout.w, containerWidth);
-                            const bH = getBlockHeightPx(b);
-                            const bY = b.layout.y;
-                            return (
-                              pointerX >= bX &&
-                              pointerX <= bX + bW &&
-                              pointerY >= bY &&
-                              pointerY <= bY + bH
-                            );
-                          });
-                          if (hovered) {
-                            const dragH = getBlockHeightPx(block, block.layout.w);
-                            const hoveredH = getBlockHeightPx(hovered);
-                            const hoveredMid = hovered.layout.y + hoveredH / 2;
-                            if (pointerY < hoveredMid) {
-                              nextY = Math.max(0, hovered.layout.y - dragH - GRID_GAP);
-                            } else {
-                              nextY = hovered.layout.y + hoveredH + GRID_GAP;
-                            }
-                          }
-                        }
+                        const nextY = Math.max(0, data.y);
                         setBlocks((prev) => {
                           const next = prev.map((b) =>
                             b.id === block.id
                               ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
                               : b
                           );
-                          const resolved = resolveAllOverlaps(next, block.id);
-                          const compacted = compactVertical(resolved, block.id);
-                          return layoutMode === 'snap' ? packMasonry(compacted) : compacted;
+                          return next;
                         });
                       }}
                       onResizeStop={(_, __, ref, _delta, position) => {
@@ -1772,7 +1673,6 @@ export function PageEditor({
                       }}
                     >
                       <div
-                        ref={block.block_type === 'text' ? setTextBlockRef(block.id) : undefined}
                         dir="ltr"
                         className={`relative rounded-lg overflow-hidden group w-full h-full ${
                           block.block_type === 'vimeo' ? 'bg-black' : 'bg-gray-100'
@@ -1797,6 +1697,7 @@ export function PageEditor({
                           isEditing={!readOnly && showEditControls}
                           onHeaderChange={handleUpdateHeaderField}
                           onTextChange={handleUpdateTextField}
+                          textMeasureRef={block.block_type === 'text' ? setTextBlockRef(block.id) : undefined}
                         />
                         {!readOnly && showEditControls && (
                           <>

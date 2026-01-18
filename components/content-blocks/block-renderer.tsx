@@ -1,5 +1,7 @@
 'use client';
 
+import type { Ref } from 'react';
+
 import { ContentBlock, HeaderContent, ImageContent, VimeoContent, TextContent } from '@/lib/types/content';
 import { ImageBlock } from './image-block';
 import { VimeoBlock } from './vimeo-block';
@@ -11,9 +13,16 @@ interface BlockRendererProps {
   isEditing?: boolean;
   onHeaderChange?: (blockId: string, content: HeaderContent) => void;
   onTextChange?: (blockId: string, content: TextContent) => void;
+  textMeasureRef?: Ref<HTMLDivElement>;
 }
 
-export function BlockRenderer({ block, isEditing = false, onHeaderChange, onTextChange }: BlockRendererProps) {
+export function BlockRenderer({
+  block,
+  isEditing = false,
+  onHeaderChange,
+  onTextChange,
+  textMeasureRef,
+}: BlockRendererProps) {
   switch (block.block_type) {
     case 'image':
       return <ImageBlock content={block.content as ImageContent} isEditing={isEditing} />;
@@ -25,6 +34,7 @@ export function BlockRenderer({ block, isEditing = false, onHeaderChange, onText
           content={block.content as TextContent}
           isEditing={isEditing}
           onChange={(content) => onTextChange?.(block.id, content)}
+          measureRef={textMeasureRef}
         />
       );
     case 'header':
