@@ -315,7 +315,8 @@ export function PageEditor({
       for (const entry of entries) {
         const id = textBlockIdsByElRef.current.get(entry.target);
         if (!id) continue;
-        updates.set(id, Math.round(entry.contentRect.height));
+        const height = Math.round((entry.target as HTMLElement).offsetHeight);
+        updates.set(id, height);
       }
       if (updates.size === 0) return;
       setBlocksTransient((prev) => {
@@ -1625,7 +1626,9 @@ export function PageEditor({
                               ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
                               : b
                           );
-                          return next;
+                          const resolved = resolveAllOverlaps(next, block.id);
+                          const compacted = compactVertical(resolved, block.id);
+                          return layoutMode === 'snap' ? packMasonry(compacted) : compacted;
                         });
                       }}
                       onResizeStop={(_, __, ref, _delta, position) => {
