@@ -29,7 +29,8 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
               header: e.currentTarget.textContent || '',
             });
           }}
-          className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded text-left"
+          onMouseDown={(e) => isEditing && e.stopPropagation()}
+          className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded text-left ${isEditing ? 'cursor-text' : ''}`}
           data-placeholder="Header"
         >
           {content.header || ''}
@@ -46,7 +47,8 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
                 description: e.currentTarget.textContent || '',
               });
             }}
-            className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded text-left"
+            onMouseDown={(e) => isEditing && e.stopPropagation()}
+            className={`text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded text-left ${isEditing ? 'cursor-text' : ''}`}
             data-placeholder="Description"
           >
             {content.description || ''}

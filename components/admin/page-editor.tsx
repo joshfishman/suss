@@ -1702,7 +1702,7 @@ export function PageEditor({
                         dir="ltr"
                         className={`relative rounded-lg overflow-hidden group w-full h-full ${
                           block.block_type === 'vimeo' ? 'bg-black' : 'bg-gray-100'
-                        }`}
+                        } ${!readOnly && showEditControls ? 'cursor-move' : ''}`}
                         onDragOver={(event) => {
                           if (block.block_type === 'image') {
                             event.preventDefault();

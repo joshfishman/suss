@@ -25,7 +25,8 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
             header: e.currentTarget.textContent || '',
           });
         }}
-        className="text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
+        onMouseDown={(e) => isEditing && e.stopPropagation()}
+        className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded px-2 -mx-2 text-left ${isEditing ? 'cursor-text' : ''}`}
         data-placeholder="Header"
       >
         {content.header || ''}
@@ -42,7 +43,8 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
               description: e.currentTarget.textContent || '',
             });
           }}
-          className="text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2 text-left"
+          onMouseDown={(e) => isEditing && e.stopPropagation()}
+          className={`text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded px-2 -mx-2 text-left ${isEditing ? 'cursor-text' : ''}`}
           data-placeholder="Description"
         >
           {content.description || ''}
