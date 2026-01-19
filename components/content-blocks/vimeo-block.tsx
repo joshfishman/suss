@@ -16,50 +16,58 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
   const playerRef = useRef<Player | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playerReady, setPlayerReady] = useState(false);
+  const lastVimeoIdRef = useRef<string | null>(null);
 
-  const initPlayer = useCallback(() => {
-    if (!iframeRef.current || !content.vimeo_id || playerRef.current) return;
-    try {
-      playerRef.current = new Player(iframeRef.current);
-      playerRef.current.on('play', () => setIsPlaying(true));
-      playerRef.current.on('pause', () => setIsPlaying(false));
-      playerRef.current.on('ended', () => setIsPlaying(false));
-      playerRef.current.ready().then(() => setPlayerReady(true));
-    } catch (error) {
-      console.error('Failed to init Vimeo player:', error);
+  // Cleanup player when vimeo_id changes or component unmounts
+  useEffect(() => {
+    const currentId = content.vimeo_id || null;
+    
+    // If ID changed, destroy old player
+    if (lastVimeoIdRef.current !== currentId && playerRef.current) {
+      try {
+        playerRef.current.destroy();
+      } catch (e) {
+        // Ignore destroy errors
+      }
+      playerRef.current = null;
+      setIsPlaying(false);
+    }
+    
+    lastVimeoIdRef.current = currentId;
+
+    // Initialize new player if we have an ID and iframe
+    if (currentId && iframeRef.current && !playerRef.current) {
+      const timer = setTimeout(() => {
+        if (!iframeRef.current || playerRef.current) return;
+        try {
+          playerRef.current = new Player(iframeRef.current);
+          playerRef.current.on('play', () => setIsPlaying(true));
+          playerRef.current.on('pause', () => setIsPlaying(false));
+          playerRef.current.on('ended', () => setIsPlaying(false));
+        } catch (error) {
+          console.error('Failed to init Vimeo player:', error);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [content.vimeo_id]);
 
+  // Cleanup on unmount
   useEffect(() => {
-    // Initialize player immediately when component mounts
-    const timer = setTimeout(() => {
-      initPlayer();
-    }, 100);
     return () => {
-      clearTimeout(timer);
       if (playerRef.current) {
-        playerRef.current.destroy();
+        try {
+          playerRef.current.destroy();
+        } catch (e) {
+          // Ignore destroy errors
+        }
         playerRef.current = null;
       }
     };
-  }, [initPlayer]);
+  }, []);
 
-  const handleTogglePlay = async () => {
-    if (!playerRef.current) {
-      initPlayer();
-      // Wait a bit for player to initialize then play
-      setTimeout(async () => {
-        if (playerRef.current) {
-          try {
-            await playerRef.current.play();
-          } catch (error) {
-            console.error('Vimeo playback failed:', error);
-          }
-        }
-      }, 200);
-      return;
-    }
+  const handleTogglePlay = useCallback(async () => {
+    if (!playerRef.current || !content.vimeo_id) return;
     try {
       if (isPlaying) {
         await playerRef.current.pause();
@@ -69,54 +77,51 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
     } catch (error) {
       console.error('Vimeo playback failed:', error);
     }
-  };
-
-  // Show placeholder if no Vimeo ID
-  if (!content.vimeo_id) {
-    return (
-      <div className="relative w-full h-full flex items-center justify-center bg-gray-100">
-        <div className="text-center text-gray-400">
-          <Video className="w-12 h-12 mx-auto mb-2" />
-          <p className="text-sm">No video ID set</p>
-        </div>
-        {isEditing && (
-          <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-            Vimeo
-          </div>
-        )}
-      </div>
-    );
-  }
+  }, [isPlaying, content.vimeo_id]);
 
   const showControls = isEditing || isHovering || !isPlaying;
+  const hasVideo = Boolean(content.vimeo_id);
 
   return (
     <div
       ref={containerRef}
       className="relative w-full group overflow-hidden bg-black"
       style={{
-        // Use paddingBottom trick for aspect ratio when not in editor
         paddingBottom: isEditing ? undefined : '56.25%',
         height: isEditing ? '100%' : 0,
       }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onClick={() => {
-        if (!isEditing) {
+        if (!isEditing && hasVideo) {
           handleTogglePlay();
         }
       }}
     >
-      <iframe
-        ref={iframeRef}
-        src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0&background=0`}
-        className="absolute top-0 left-0 w-full h-full border-0 bg-black z-0 pointer-events-none"
-        frameBorder="0"
-        allow="autoplay; fullscreen; picture-in-picture"
-      />
+      {/* Always render iframe container, use key to force remount on ID change */}
+      {hasVideo ? (
+        <iframe
+          key={content.vimeo_id}
+          ref={iframeRef}
+          src={`https://player.vimeo.com/video/${content.vimeo_id}?title=0&byline=0&portrait=0&controls=0&background=0`}
+          className="absolute top-0 left-0 w-full h-full border-0 bg-black z-0 pointer-events-none"
+          frameBorder="0"
+          allow="autoplay; fullscreen; picture-in-picture"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+          <div className="text-center text-gray-400">
+            <Video className="w-12 h-12 mx-auto mb-2" />
+            <p className="text-sm">Enter Vimeo ID below</p>
+          </div>
+        </div>
+      )}
+      
       {/* Top edge cover to hide Vimeo letterbox line */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-black z-[1]" />
-      {!isEditing && (
+      {hasVideo && <div className="absolute top-0 left-0 right-0 h-[2px] bg-black z-[1]" />}
+      
+      {/* Play/Pause overlay for non-editing mode */}
+      {!isEditing && hasVideo && (
         <button
           type="button"
           onClick={(event) => {
@@ -131,11 +136,13 @@ export function VimeoBlock({ content, isEditing = false }: VimeoBlockProps) {
           {isPlaying ? <Pause className="w-10 h-10" /> : <Play className="w-10 h-10" />}
         </button>
       )}
+      
       {content.caption && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm z-20">
           {content.caption}
         </div>
       )}
+      
       {isEditing && (
         <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded z-20">
           Vimeo

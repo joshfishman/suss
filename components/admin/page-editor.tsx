@@ -1732,6 +1732,8 @@ export function PageEditor({
                                   value={(block.content as any)?.vimeo_id || ''}
                                   onChange={(e) => handleUpdateVimeoField(block.id, 'vimeo_id', e.target.value)}
                                   onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
                                   className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                                 />
                                 <input
@@ -1740,6 +1742,8 @@ export function PageEditor({
                                   value={(block.content as any)?.title || ''}
                                   onChange={(e) => handleUpdateVimeoField(block.id, 'title', e.target.value)}
                                   onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
                                   className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                                 />
                                 <input
@@ -1748,6 +1752,8 @@ export function PageEditor({
                                   value={(block.content as any)?.caption || ''}
                                   onChange={(e) => handleUpdateVimeoField(block.id, 'caption', e.target.value)}
                                   onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
                                   className="w-full bg-transparent text-white text-xs px-2 py-1 rounded border border-white/20"
                                 />
                                 <div className="flex justify-end gap-2 pt-1">
