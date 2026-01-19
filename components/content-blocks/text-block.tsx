@@ -11,6 +11,68 @@ interface TextBlockProps {
   measureRef?: Ref<HTMLDivElement>;
 }
 
+// Paste plain text only (for headers)
+function handlePlainTextPaste(e: React.ClipboardEvent) {
+  e.preventDefault();
+  const text = e.clipboardData.getData('text/plain');
+  document.execCommand('insertText', false, text);
+}
+
+// Paste with allowed formatting (bold, italic, underline, links)
+function handleFormattedPaste(e: React.ClipboardEvent) {
+  e.preventDefault();
+  const html = e.clipboardData.getData('text/html');
+  const text = e.clipboardData.getData('text/plain');
+  
+  if (html) {
+    // Parse HTML and keep only allowed tags
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // Remove all elements except allowed ones
+    const walk = (node: Node) => {
+      const children = Array.from(node.childNodes);
+      for (const child of children) {
+        if (child.nodeType === Node.ELEMENT_NODE) {
+          const el = child as HTMLElement;
+          const tag = el.tagName.toLowerCase();
+          const allowed = ['b', 'strong', 'i', 'em', 'u', 'a'];
+          
+          if (allowed.includes(tag)) {
+            // Keep only href for links, remove all other attributes
+            if (tag === 'a') {
+              const href = el.getAttribute('href');
+              Array.from(el.attributes).forEach(attr => el.removeAttribute(attr.name));
+              if (href) el.setAttribute('href', href);
+              el.setAttribute('target', '_blank');
+              el.setAttribute('rel', 'noopener noreferrer');
+            } else {
+              // Remove all attributes from other allowed tags
+              Array.from(el.attributes).forEach(attr => el.removeAttribute(attr.name));
+            }
+            walk(child);
+          } else {
+            // Replace disallowed element with its children
+            const fragment = document.createDocumentFragment();
+            while (el.firstChild) {
+              fragment.appendChild(el.firstChild);
+            }
+            node.replaceChild(fragment, child);
+            // Re-walk since we modified the DOM
+            walk(node);
+            return;
+          }
+        }
+      }
+    };
+    
+    walk(temp);
+    document.execCommand('insertHTML', false, temp.innerHTML);
+  } else {
+    document.execCommand('insertText', false, text);
+  }
+}
+
 export function TextBlock({ content, isEditing = false, onChange, measureRef }: TextBlockProps) {
   return (
     <div
@@ -29,6 +91,7 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
               header: e.currentTarget.textContent || '',
             });
           }}
+          onPaste={handlePlainTextPaste}
           onMouseDown={(e) => isEditing && e.stopPropagation()}
           className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded text-left ${isEditing ? 'cursor-text' : ''}`}
           data-placeholder="Header"
@@ -44,15 +107,15 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
               if (!onChange) return;
               onChange({
                 ...content,
-                description: e.currentTarget.textContent || '',
+                description: e.currentTarget.innerHTML || '',
               });
             }}
+            onPaste={handleFormattedPaste}
             onMouseDown={(e) => isEditing && e.stopPropagation()}
-            className={`text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded text-left ${isEditing ? 'cursor-text' : ''}`}
+            className={`text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded text-left ${isEditing ? 'cursor-text' : ''} [&_a]:underline [&_a]:text-white/90`}
             data-placeholder="Description"
-          >
-            {content.description || ''}
-          </p>
+            dangerouslySetInnerHTML={{ __html: content.description || '' }}
+          />
         ) : null}
       </div>
       {isEditing && (

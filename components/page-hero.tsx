@@ -12,6 +12,13 @@ interface PageHeroProps {
   descriptionRef?: Ref<HTMLParagraphElement>;
 }
 
+// Paste plain text only
+function handlePlainTextPaste(e: React.ClipboardEvent) {
+  e.preventDefault();
+  const text = e.clipboardData.getData('text/plain');
+  document.execCommand('insertText', false, text);
+}
+
 export function PageHero({
   title,
   description,
@@ -34,6 +41,7 @@ export function PageHero({
           if (!onTitleChange) return;
           onTitleChange(e.currentTarget.textContent || '');
         }}
+        onPaste={handlePlainTextPaste}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -57,6 +65,7 @@ export function PageHero({
             if (!onDescriptionChange) return;
             onDescriptionChange(e.currentTarget.textContent || '');
           }}
+          onPaste={handlePlainTextPaste}
           className={`text-lg md:text-xl font-light leading-relaxed max-w-2xl outline-none ${
             isEditing
               ? 'text-white/70 focus:bg-gray-800 rounded px-2 -mx-2 transition-colors cursor-text text-left'
