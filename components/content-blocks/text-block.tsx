@@ -76,7 +76,7 @@ function handleFormattedPaste(e: React.ClipboardEvent) {
 export function TextBlock({ content, isEditing = false, onChange, measureRef }: TextBlockProps) {
   return (
     <div
-      className="relative w-full h-full flex flex-col justify-start bg-black text-white"
+      className={`relative w-full h-full flex flex-col justify-start bg-black text-white transition-colors ${isEditing ? 'hover:bg-white/5' : ''}`}
       dir="ltr"
     >
       <div ref={measureRef} className="w-full py-10 px-0">
@@ -93,7 +93,7 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
           }}
           onPaste={handlePlainTextPaste}
           onMouseDown={(e) => isEditing && e.stopPropagation()}
-          className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none focus:bg-transparent rounded text-left ${isEditing ? 'cursor-text' : ''}`}
+          className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded text-left transition-colors ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10 px-2 -mx-2' : ''}`}
           data-placeholder="Header"
         >
           {content.header || ''}
@@ -112,7 +112,7 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
             }}
             onPaste={handleFormattedPaste}
             onMouseDown={(e) => isEditing && e.stopPropagation()}
-            className={`text-base md:text-lg text-white/70 mt-4 outline-none focus:bg-transparent rounded text-left ${isEditing ? 'cursor-text' : ''} [&_a]:underline [&_a]:text-white/90`}
+            className={`text-base md:text-lg text-white/70 mt-4 outline-none rounded text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10 px-2 -mx-2' : ''}`}
             data-placeholder="Description"
             dangerouslySetInnerHTML={{ __html: content.description || '' }}
           />
