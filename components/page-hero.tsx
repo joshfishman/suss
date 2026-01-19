@@ -49,7 +49,7 @@ export function PageHero({
           }
         }}
         className={`text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none ${
-          isEditing ? 'hover:bg-white/10 focus:bg-white/10 rounded px-2 -mx-2 transition-colors cursor-text text-left' : ''
+          isEditing ? 'hover:bg-zinc-900 focus:bg-zinc-900 rounded px-2 -mx-2 transition-colors cursor-text text-left' : ''
         }`}
         data-placeholder={isEditing ? 'Page Title' : undefined}
       >
@@ -68,7 +68,7 @@ export function PageHero({
           onPaste={handlePlainTextPaste}
           className={`text-lg md:text-xl font-light leading-relaxed max-w-2xl outline-none ${
             isEditing
-              ? 'text-white/70 hover:bg-white/10 focus:bg-white/10 rounded px-2 -mx-2 transition-colors cursor-text text-left'
+              ? 'text-white/70 hover:bg-zinc-900 focus:bg-zinc-900 rounded px-2 -mx-2 transition-colors cursor-text text-left'
               : 'text-muted-foreground'
           }`}
           data-placeholder={isEditing ? 'Click to add a description...' : undefined}

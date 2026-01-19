@@ -73,7 +73,7 @@ function handleFormattedPaste(e: React.ClipboardEvent) {
 export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBlockProps) {
   return (
     <div
-      className={`relative w-full h-full flex flex-col justify-center p-6 bg-black text-white transition-colors ${isEditing ? 'hover:bg-white/5' : ''}`}
+      className={`relative w-full h-full flex flex-col justify-center p-6 bg-black text-white transition-colors ${isEditing ? 'group hover:bg-zinc-950' : ''}`}
       dir="ltr"
     >
       {(content.header || isEditing) && (
@@ -90,7 +90,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
           }}
           onPaste={handlePlainTextPaste}
           onMouseDown={(e) => isEditing && e.stopPropagation()}
-          className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded px-2 -mx-2 text-left transition-colors ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10' : ''}`}
+          className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded px-2 -mx-2 text-left transition-colors ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900' : ''}`}
           data-placeholder="Header"
         >
           {content.header || ''}
@@ -110,7 +110,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
           }}
           onPaste={handleFormattedPaste}
           onMouseDown={(e) => isEditing && e.stopPropagation()}
-          className={`text-base md:text-lg text-white/70 outline-none rounded px-2 -mx-2 text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10' : ''} ${content.header || isEditing ? 'mt-4' : ''}`}
+          className={`text-base md:text-lg text-white/70 outline-none rounded px-2 -mx-2 text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900' : ''} ${content.header || isEditing ? 'mt-4' : ''}`}
           data-placeholder="Description"
           dangerouslySetInnerHTML={{ __html: content.description || '' }}
         />
