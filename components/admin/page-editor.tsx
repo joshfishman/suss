@@ -1677,6 +1677,7 @@ export function PageEditor({
                         const nextY = Math.max(0, position.y);
 
                         setBlocks((prev) => {
+                          // Apply resize to the block
                           const next = prev.map((b) =>
                             b.id === block.id
                               ? {
@@ -1691,7 +1692,9 @@ export function PageEditor({
                                 }
                               : b
                           );
-                          return layoutMode === 'snap' ? packMasonry(next) : next;
+                          // Resolve overlaps (push others down) and compact
+                          const resolved = resolveAllOverlaps(next, block.id);
+                          return compactVertical(resolved, block.id);
                         });
                       }}
                     >
