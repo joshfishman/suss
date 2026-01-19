@@ -16,6 +16,7 @@ import {
   pxToGridW,
   pxToGridX,
   ratioToPxH,
+  snapToGridX,
 } from '@/lib/grid';
 import { BlockRenderer } from '@/components/content-blocks/block-renderer';
 import { BlockEditorModal } from './block-editor-modal';
@@ -1637,8 +1638,11 @@ export function PageEditor({
                       }}
                       onDragStop={(_, data) => {
                         setDraggingBlockId(null);
-                        const nextXRaw = pxToGridX(data.x, containerWidth);
-                        const nextX = isSingleColumn ? 0 : clampGridX(nextXRaw, block.layout.w);
+                        const nextX = isSingleColumn
+                          ? 0
+                          : layoutMode === 'snap'
+                            ? snapToGridX(data.x, block.layout.w, containerWidth)
+                            : clampGridX(pxToGridX(data.x, containerWidth), block.layout.w);
                         const nextY = Math.max(0, data.y);
                         setBlocks((prev) => {
                           const next = prev.map((b) =>
@@ -1658,8 +1662,11 @@ export function PageEditor({
                         const nextH = ratio
                           ? ratioToPxH(nextW, ratio, containerWidth)
                           : Math.max(80, ref.offsetHeight);
-                        const nextXRaw = pxToGridX(position.x, containerWidth);
-                        let nextX = clampGridX(nextXRaw, nextW);
+                        let nextX = isSingleColumn
+                          ? 0
+                          : layoutMode === 'snap'
+                            ? snapToGridX(position.x, nextW, containerWidth)
+                            : clampGridX(pxToGridX(position.x, containerWidth), nextW);
                         const shouldSnapFullWidth = block.block_type === 'image';
                         if (isSingleColumn) {
                           nextW = GRID_COLS;
