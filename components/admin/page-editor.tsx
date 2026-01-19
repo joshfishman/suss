@@ -975,8 +975,13 @@ export function PageEditor({
     
     // Simple default sizing
     const blockW = 2;
+    // Text blocks use content height + 5rem padding (measured later), others use aspect ratio
     const blockH =
-      type === 'vimeo' ? ratioToPxH(blockW, 16 / 9, containerWidth) : ratioToPxH(blockW, 1, containerWidth);
+      type === 'text' || type === 'header'
+        ? 160 // Initial height, will be auto-measured
+        : type === 'vimeo'
+          ? ratioToPxH(blockW, 16 / 9, containerWidth)
+          : ratioToPxH(blockW, 1, containerWidth);
     const { x: nextX, y: nextY } = getNextPlacement(blockW);
 
     const newBlock: ContentBlock = {
@@ -1584,6 +1589,10 @@ export function PageEditor({
                       style={{
                         zIndex:
                           draggingBlockId === block.id ? 60 : Math.max(1, 40 - Math.round(yPx / 10)),
+                        transition:
+                          draggingBlockId && draggingBlockId !== block.id
+                            ? 'transform 0.2s ease-out'
+                            : undefined,
                       }}
                       dragGrid={
                         !isSingleColumn && layoutMode === 'snap'
@@ -1614,6 +1623,17 @@ export function PageEditor({
                       disableDragging={readOnly || !showEditControls}
                       onDragStart={() => {
                         setDraggingBlockId(block.id);
+                      }}
+                      onDrag={(e) => {
+                        // Auto-scroll when dragging near viewport edges
+                        const pointerY = 'clientY' in e ? (e as MouseEvent).clientY : 0;
+                        const scrollMargin = 80;
+                        const scrollSpeed = 15;
+                        if (pointerY < scrollMargin) {
+                          window.scrollBy(0, -scrollSpeed);
+                        } else if (pointerY > window.innerHeight - scrollMargin) {
+                          window.scrollBy(0, scrollSpeed);
+                        }
                       }}
                       onDragStop={(_, data) => {
                         setDraggingBlockId(null);

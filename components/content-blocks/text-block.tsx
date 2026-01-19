@@ -17,7 +17,7 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
       className="relative w-full h-full flex flex-col justify-start bg-black text-white"
       dir="ltr"
     >
-      <div ref={measureRef} className="w-full py-5 px-0">
+      <div ref={measureRef} className="w-full py-10 px-0">
         <h3
           dir="ltr"
           contentEditable={isEditing}
