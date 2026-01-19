@@ -85,17 +85,26 @@ async function ensureDrafts(slug: string) {
       .order('sort_order', { ascending: true });
 
     if (liveBlocks?.length) {
-      await supabase
+      // Check if draft blocks already exist to avoid duplicates
+      const { data: existingDraftBlocks } = await supabase
         .from('content_blocks_drafts')
-        .insert(
-          liveBlocks.map((block) => ({
-            page_draft_id: draftPage.id,
-            block_type: block.block_type,
-            content: block.content,
-            layout: block.layout,
-            sort_order: block.sort_order,
-          })),
-        );
+        .select('id')
+        .eq('page_draft_id', draftPage.id)
+        .limit(1);
+
+      if (!existingDraftBlocks?.length) {
+        await supabase
+          .from('content_blocks_drafts')
+          .insert(
+            liveBlocks.map((block) => ({
+              page_draft_id: draftPage.id,
+              block_type: block.block_type,
+              content: block.content,
+              layout: block.layout,
+              sort_order: block.sort_order,
+            })),
+          );
+      }
     }
   }
 

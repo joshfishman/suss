@@ -96,8 +96,6 @@ export async function DELETE(
 ) {
   const { slug } = await params;
   const supabase = await createClient();
-  const url = new URL(request.url);
-  const draftMode = url.searchParams.get('draft') === '1';
   
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser();
@@ -111,35 +109,46 @@ export async function DELETE(
     return NextResponse.json({ error: 'Cannot delete reserved pages' }, { status: 400 });
   }
 
-  // First get the page to get its ID
-  const { data: page, error: pageError } = await supabase
-    .from(draftMode ? 'pages_drafts' : 'pages')
+  // Delete draft page and its blocks first
+  const { data: draftPage } = await supabase
+    .from('pages_drafts')
     .select('id')
     .eq('slug', slug)
     .single();
 
-  if (pageError) {
-    return NextResponse.json({ error: pageError.message }, { status: 404 });
+  if (draftPage) {
+    await supabase
+      .from('content_blocks_drafts')
+      .delete()
+      .eq('page_draft_id', draftPage.id);
+
+    await supabase
+      .from('pages_drafts')
+      .delete()
+      .eq('slug', slug);
   }
 
-  // Delete associated content blocks first
-  const { error: blocksError } = await supabase
-    .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
-    .delete()
-    .eq(draftMode ? 'page_draft_id' : 'page_id', page.id);
+  // Delete published page and its blocks
+  const { data: publishedPage } = await supabase
+    .from('pages')
+    .select('id')
+    .eq('slug', slug)
+    .single();
 
-  if (blocksError) {
-    return NextResponse.json({ error: blocksError.message }, { status: 500 });
+  if (publishedPage) {
+    await supabase
+      .from('content_blocks')
+      .delete()
+      .eq('page_id', publishedPage.id);
+
+    await supabase
+      .from('pages')
+      .delete()
+      .eq('slug', slug);
   }
 
-  // Delete the page
-  const { error: deleteError } = await supabase
-    .from(draftMode ? 'pages_drafts' : 'pages')
-    .delete()
-    .eq('slug', slug);
-
-  if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  if (!draftPage && !publishedPage) {
+    return NextResponse.json({ error: 'Page not found' }, { status: 404 });
   }
 
   return NextResponse.json({ success: true });
