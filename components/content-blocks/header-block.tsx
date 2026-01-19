@@ -76,25 +76,27 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
       className={`relative w-full h-full flex flex-col justify-center p-6 bg-black text-white transition-colors ${isEditing ? 'hover:bg-white/5' : ''}`}
       dir="ltr"
     >
-      <h3
-        dir="ltr"
-        contentEditable={isEditing}
-        suppressContentEditableWarning
-        onBlur={(e) => {
-          if (!onChange) return;
-          onChange({
-            ...content,
-            header: e.currentTarget.textContent || '',
-          });
-        }}
-        onPaste={handlePlainTextPaste}
-        onMouseDown={(e) => isEditing && e.stopPropagation()}
-        className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded px-2 -mx-2 text-left transition-colors ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10' : ''}`}
-        data-placeholder="Header"
-      >
-        {content.header || ''}
-      </h3>
-      {content.description || isEditing ? (
+      {(content.header || isEditing) && (
+        <h3
+          dir="ltr"
+          contentEditable={isEditing}
+          suppressContentEditableWarning
+          onBlur={(e) => {
+            if (!onChange) return;
+            onChange({
+              ...content,
+              header: e.currentTarget.textContent || '',
+            });
+          }}
+          onPaste={handlePlainTextPaste}
+          onMouseDown={(e) => isEditing && e.stopPropagation()}
+          className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded px-2 -mx-2 text-left transition-colors ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10' : ''}`}
+          data-placeholder="Header"
+        >
+          {content.header || ''}
+        </h3>
+      )}
+      {(content.description || isEditing) && (
         <p
           dir="ltr"
           contentEditable={isEditing}
@@ -108,11 +110,11 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
           }}
           onPaste={handleFormattedPaste}
           onMouseDown={(e) => isEditing && e.stopPropagation()}
-          className={`text-base md:text-lg text-white/70 mt-4 outline-none rounded px-2 -mx-2 text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10' : ''}`}
+          className={`text-base md:text-lg text-white/70 outline-none rounded px-2 -mx-2 text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10' : ''} ${content.header || isEditing ? 'mt-4' : ''}`}
           data-placeholder="Description"
           dangerouslySetInnerHTML={{ __html: content.description || '' }}
         />
-      ) : null}
+      )}
       {isEditing && (
         <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
           Header

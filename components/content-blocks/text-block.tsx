@@ -80,25 +80,27 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
       dir="ltr"
     >
       <div ref={measureRef} className="w-full py-10 px-0">
-        <h3
-          dir="ltr"
-          contentEditable={isEditing}
-          suppressContentEditableWarning
-          onBlur={(e) => {
-            if (!onChange) return;
-            onChange({
-              ...content,
-              header: e.currentTarget.textContent || '',
-            });
-          }}
-          onPaste={handlePlainTextPaste}
-          onMouseDown={(e) => isEditing && e.stopPropagation()}
-          className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded text-left transition-colors ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10 px-2 -mx-2' : ''}`}
-          data-placeholder="Header"
-        >
-          {content.header || ''}
-        </h3>
-        {content.description || isEditing ? (
+        {(content.header || isEditing) && (
+          <h3
+            dir="ltr"
+            contentEditable={isEditing}
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              if (!onChange) return;
+              onChange({
+                ...content,
+                header: e.currentTarget.textContent || '',
+              });
+            }}
+            onPaste={handlePlainTextPaste}
+            onMouseDown={(e) => isEditing && e.stopPropagation()}
+            className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded text-left transition-colors ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10 px-2 -mx-2' : ''}`}
+            data-placeholder="Header"
+          >
+            {content.header || ''}
+          </h3>
+        )}
+        {(content.description || isEditing) && (
           <p
             dir="ltr"
             contentEditable={isEditing}
@@ -112,11 +114,11 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
             }}
             onPaste={handleFormattedPaste}
             onMouseDown={(e) => isEditing && e.stopPropagation()}
-            className={`text-base md:text-lg text-white/70 mt-4 outline-none rounded text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10 px-2 -mx-2' : ''}`}
+            className={`text-base md:text-lg text-white/70 outline-none rounded text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-white/10 focus:bg-white/10 px-2 -mx-2' : ''} ${content.header || isEditing ? 'mt-4' : ''}`}
             data-placeholder="Description"
             dangerouslySetInnerHTML={{ __html: content.description || '' }}
           />
-        ) : null}
+        )}
       </div>
       {isEditing && (
         <div className="absolute top-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
