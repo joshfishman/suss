@@ -979,7 +979,11 @@ export function PageEditor({
     if (layoutMode === 'free') {
       if (didConvertFreeLayoutRef.current) return;
       didConvertFreeLayoutRef.current = true;
-      setBlocks((current) => convertBlocksToFree(current));
+      setBlocks((current) => {
+        const needsConversion = current.some((block) => block.layout.w <= GRID_COLS);
+        if (!needsConversion) return current;
+        return convertBlocksToFree(current);
+      });
       return;
     }
     didConvertFreeLayoutRef.current = false;
@@ -1546,19 +1550,32 @@ export function PageEditor({
               >
                 Delete Page
               </Button>
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  onClick={handleToggleLayoutMode}
-                  variant="outline"
-                  size="sm"
-                  className={
-                    layoutMode === 'snap'
-                      ? 'bg-white text-black hover:bg-gray-100'
-                      : 'border-gray-600 text-white hover:bg-gray-800'
-                  }
-                >
-                  {layoutMode === 'snap' ? 'Snap Grid' : 'Free Grid'}
-                </Button>
+              <div className="flex items-center gap-2 ml-2">
+                <span className="text-xs uppercase tracking-wide text-white/70">Grid Layout</span>
+                <div className="inline-flex rounded-full border border-gray-700 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => layoutMode !== 'snap' && handleToggleLayoutMode()}
+                    className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
+                      layoutMode === 'snap'
+                        ? 'bg-white text-black'
+                        : 'text-white/70 hover:text-white'
+                    }`}
+                  >
+                    Snap
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => layoutMode !== 'free' && handleToggleLayoutMode()}
+                    className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
+                      layoutMode === 'free'
+                        ? 'bg-white text-black'
+                        : 'text-white/70 hover:text-white'
+                    }`}
+                  >
+                    Free
+                  </button>
+                </div>
               </div>
               <div className="w-px h-6 bg-gray-700 mx-2" />
               <Link href={`/${page.slug}`} target="_blank">
