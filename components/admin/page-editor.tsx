@@ -202,6 +202,7 @@ export function PageEditor({
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const measureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const didConvertFreeLayoutRef = useRef(false);
   const lastSavedRef = useRef({
     title: page.title,
     heroTitle: page.hero_title || page.title,
@@ -658,11 +659,13 @@ export function PageEditor({
       const ratio = getRatioForBlock(block);
       const effectiveW = widthOverride ?? block.layout.w;
       if (ratio) {
-        return ratioToPxH(effectiveW, ratio, containerWidth);
+        return layoutMode === 'free'
+          ? Math.max(80, Math.round(effectiveW / ratio))
+          : ratioToPxH(effectiveW, ratio, containerWidth);
       }
       return block.layout.h;
     },
-    [getRatioForBlock, containerWidth]
+    [getRatioForBlock, containerWidth, layoutMode]
   );
 
   const isOverlappingWithRatios = useCallback(
@@ -887,8 +890,14 @@ export function PageEditor({
         return { x: 0, y: 0 };
       }
 
-      const normalized =
-        layoutMode === 'snap' ? packMasonry(existingBlocks) : existingBlocks;
+      if (layoutMode === 'free') {
+        const maxBottom = Math.max(
+          ...existingBlocks.map((block) => block.layout.y + getBlockHeightPx(block))
+        );
+        return { x: 0, y: Number.isFinite(maxBottom) ? maxBottom + GRID_GAP : 0 };
+      }
+
+      const normalized = packMasonry(existingBlocks);
 
       const colHeights = Array.from({ length: GRID_COLS }, () => 0);
       for (const block of normalized) {
@@ -915,12 +924,76 @@ export function PageEditor({
     [blocks, getBlockHeightPx, layoutMode, packMasonry]
   );
 
+  const convertBlocksToFree = useCallback(
+    (items: ContentBlock[]) =>
+      items.map((block) => {
+        const nextW = gridToPxW(block.layout.w, containerWidth);
+        const ratio = getRatioForBlock(block);
+        return {
+          ...block,
+          layout: {
+            ...block.layout,
+            x: gridToPxX(block.layout.x, containerWidth),
+            w: nextW,
+            h: ratio ? Math.max(80, Math.round(nextW / ratio)) : block.layout.h,
+          },
+        };
+      }),
+    [containerWidth, getRatioForBlock],
+  );
+
+  const convertBlocksToSnap = useCallback(
+    (items: ContentBlock[]) =>
+      items.map((block) => {
+        const nextW = pxToGridW(block.layout.w, containerWidth);
+        const nextX = clampGridX(pxToGridX(block.layout.x, containerWidth), nextW);
+        const ratio = getRatioForBlock(block);
+        return {
+          ...block,
+          layout: {
+            ...block.layout,
+            x: nextX,
+            w: nextW,
+            h: ratio ? ratioToPxH(nextW, ratio, containerWidth) : block.layout.h,
+          },
+        };
+      }),
+    [containerWidth, getRatioForBlock],
+  );
+
+  const handleToggleLayoutMode = useCallback(() => {
+    setLayoutMode((prev) => {
+      const next = prev === 'snap' ? 'free' : 'snap';
+      setBlocks((current) => {
+        if (next === 'free') {
+          return convertBlocksToFree(current);
+        }
+        const converted = convertBlocksToSnap(current);
+        return packMasonry(converted);
+      });
+      return next;
+    });
+  }, [convertBlocksToFree, convertBlocksToSnap, packMasonry, setBlocks]);
+
+  useEffect(() => {
+    if (layoutMode === 'free') {
+      if (didConvertFreeLayoutRef.current) return;
+      didConvertFreeLayoutRef.current = true;
+      setBlocks((current) => convertBlocksToFree(current));
+      return;
+    }
+    didConvertFreeLayoutRef.current = false;
+  }, [layoutMode, convertBlocksToFree, setBlocks]);
+
   useEffect(() => {
     setBlocks((prev) => {
       let changed = false;
       const next = prev.map((block) => {
         if (block.block_type !== 'vimeo') return block;
-        const nextH = ratioToPxH(block.layout.w, 16 / 9, containerWidth);
+        const nextH =
+          layoutMode === 'free'
+            ? Math.max(80, Math.round(block.layout.w / (16 / 9)))
+            : ratioToPxH(block.layout.w, 16 / 9, containerWidth);
         if (block.layout.h === nextH) return block;
         changed = true;
         return { ...block, layout: { ...block.layout, h: nextH } };
@@ -952,7 +1025,10 @@ export function PageEditor({
           return block;
         }
         imageRatioRef.current[block.layout.i] = ratio;
-        const newH = ratioToPxH(block.layout.w, ratio, containerWidth);
+        const newH =
+          layoutMode === 'free'
+            ? Math.max(80, Math.round(block.layout.w / ratio))
+            : ratioToPxH(block.layout.w, ratio, containerWidth);
         if (block.layout.h !== newH) {
           changed = true;
           normalizedImageLayoutsRef.current.add(block.layout.i);
@@ -1466,7 +1542,7 @@ export function PageEditor({
               </Button>
               <div className="flex items-center gap-1 ml-2">
                 <Button
-                  onClick={() => setLayoutMode('snap')}
+                  onClick={handleToggleLayoutMode}
                   variant="outline"
                   size="sm"
                   className={
@@ -1475,19 +1551,7 @@ export function PageEditor({
                       : 'border-gray-600 text-white hover:bg-gray-800'
                   }
                 >
-                  Snap Grid
-                </Button>
-                <Button
-                  onClick={() => setLayoutMode('free')}
-                  variant="outline"
-                  size="sm"
-                  className={
-                    layoutMode === 'free'
-                      ? 'bg-white text-black hover:bg-gray-100'
-                      : 'border-gray-600 text-white hover:bg-gray-800'
-                  }
-                >
-                  Free Grid
+                  {layoutMode === 'snap' ? 'Snap Grid' : 'Free Grid'}
                 </Button>
               </div>
               <div className="w-px h-6 bg-gray-700 mx-2" />
@@ -1575,9 +1639,15 @@ export function PageEditor({
                   const ratio = getRatioForBlock(block);
                   const widthPx = isSingleColumn
                     ? containerWidth
-                    : gridToPxW(block.layout.w, containerWidth);
+                    : layoutMode === 'free'
+                      ? block.layout.w
+                      : gridToPxW(block.layout.w, containerWidth);
                   const heightPx = ratio ? widthPx / ratio : block.layout.h;
-                  const xPx = isSingleColumn ? 0 : gridToPxX(block.layout.x, containerWidth);
+                  const xPx = isSingleColumn
+                    ? 0
+                    : layoutMode === 'free'
+                      ? block.layout.x
+                      : gridToPxX(block.layout.x, containerWidth);
                   const yPx = block.layout.y;
 
                   return (
@@ -1605,8 +1675,20 @@ export function PageEditor({
                           ? [colWidth(containerWidth) + GRID_GAP, 1]
                           : undefined
                       }
-                      minWidth={isSingleColumn ? containerWidth : gridToPxW(1, containerWidth)}
-                      maxWidth={isSingleColumn ? containerWidth : gridToPxW(GRID_COLS, containerWidth)}
+                      minWidth={
+                        isSingleColumn
+                          ? containerWidth
+                          : layoutMode === 'free'
+                            ? 80
+                            : gridToPxW(1, containerWidth)
+                      }
+                      maxWidth={
+                        isSingleColumn
+                          ? containerWidth
+                          : layoutMode === 'free'
+                            ? containerWidth
+                            : gridToPxW(GRID_COLS, containerWidth)
+                      }
                       enableResizing={
                         !readOnly && showEditControls && !isSingleColumn
                           ? {
@@ -1642,7 +1724,10 @@ export function PageEditor({
                           ? 0
                           : layoutMode === 'snap'
                             ? snapToGridX(data.x, block.layout.w, containerWidth)
-                            : clampGridX(pxToGridX(data.x, containerWidth), block.layout.w);
+                            : Math.max(
+                                0,
+                                Math.min(data.x, Math.max(0, containerWidth - widthPx))
+                              );
                         const nextY = Math.max(0, data.y);
                         setBlocks((prev) => {
                           const next = prev.map((b) =>
@@ -1650,29 +1735,41 @@ export function PageEditor({
                               ? { ...b, layout: { ...b.layout, x: nextX, y: nextY } }
                               : b
                           );
-                          const resolved = resolveAllOverlaps(next, block.id);
-                          const compacted = compactVertical(resolved, block.id);
-                          return layoutMode === 'snap' ? packMasonry(compacted) : compacted;
+                          if (layoutMode === 'snap') {
+                            const resolved = resolveAllOverlaps(next, block.id);
+                            const compacted = compactVertical(resolved, block.id);
+                            return packMasonry(compacted);
+                          }
+                          return next;
                         });
                       }}
                       onResizeStop={(_, __, ref, _delta, position) => {
                         const nextWidthPx = ref.offsetWidth;
                         const fullWidthPx = gridToPxW(GRID_COLS, containerWidth);
-                        let nextW = pxToGridW(nextWidthPx, containerWidth);
+                        let nextW =
+                          layoutMode === 'snap'
+                            ? pxToGridW(nextWidthPx, containerWidth)
+                            : Math.max(80, nextWidthPx);
                         const nextH = ratio
-                          ? ratioToPxH(nextW, ratio, containerWidth)
+                          ? layoutMode === 'snap'
+                            ? ratioToPxH(nextW, ratio, containerWidth)
+                            : Math.max(80, Math.round(nextW / ratio))
                           : Math.max(80, ref.offsetHeight);
                         let nextX = isSingleColumn
                           ? 0
                           : layoutMode === 'snap'
                             ? snapToGridX(position.x, nextW, containerWidth)
-                            : clampGridX(pxToGridX(position.x, containerWidth), nextW);
+                            : Math.max(
+                                0,
+                                Math.min(position.x, Math.max(0, containerWidth - nextW))
+                              );
                         const shouldSnapFullWidth = block.block_type === 'image';
                         if (isSingleColumn) {
-                          nextW = GRID_COLS;
+                          nextW = layoutMode === 'snap' ? GRID_COLS : containerWidth;
                           nextX = 0;
                         }
                         if (
+                          layoutMode === 'snap' &&
                           !isSingleColumn &&
                           shouldSnapFullWidth &&
                           (position.x + nextWidthPx >= fullWidthPx - 1 ||
@@ -1699,9 +1796,11 @@ export function PageEditor({
                                 }
                               : b
                           );
-                          // Resolve overlaps (push others down) and compact
-                          const resolved = resolveAllOverlaps(next, block.id);
-                          return compactVertical(resolved, block.id);
+                          if (layoutMode === 'snap') {
+                            const resolved = resolveAllOverlaps(next, block.id);
+                            return compactVertical(resolved, block.id);
+                          }
+                          return next;
                         });
                       }}
                     >

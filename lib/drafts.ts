@@ -116,9 +116,30 @@ async function ensureDrafts(slug: string) {
     .eq('page_draft_id', draftPage.id)
     .order('sort_order', { ascending: true });
 
+  const seenLayouts = new Set<string>();
+  const dedupedBlocks: ContentBlock[] = [];
+  const duplicateIds: string[] = [];
+
+  (draftBlocks || []).forEach((block) => {
+    const layoutKey = String(block.layout?.i ?? block.id);
+    if (seenLayouts.has(layoutKey)) {
+      duplicateIds.push(block.id);
+      return;
+    }
+    seenLayouts.add(layoutKey);
+    dedupedBlocks.push(block as ContentBlock);
+  });
+
+  if (duplicateIds.length > 0) {
+    await supabase
+      .from('content_blocks_drafts')
+      .delete()
+      .in('id', duplicateIds);
+  }
+
   return {
     page: draftPage as DraftPage,
-    blocks: (draftBlocks || []) as ContentBlock[],
+    blocks: dedupedBlocks,
   };
 }
 
