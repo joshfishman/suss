@@ -100,8 +100,8 @@ export async function POST(request: Request) {
   await supabase.from('content_blocks_drafts').delete().eq('page_draft_id', draftPage.id);
   await supabase.from('pages_drafts').delete().eq('id', draftPage.id);
 
-  revalidateTag(`page:${slug}`);
-  revalidateTag('projects');
+  revalidateTag(`page:${slug}`, 'default');
+  revalidateTag('projects', 'default');
 
   return NextResponse.json({ success: true });
 }
