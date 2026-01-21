@@ -42,16 +42,6 @@ export function centerGridX(w: number) {
 // Snap to center if close enough, otherwise return nearest grid position
 export function snapToGridX(px: number, w: number, containerWidth: number) {
   const rawX = px / (colWidth(containerWidth) + GRID_GAP);
-  const centerX = centerGridX(w);
-  const centerPx = gridToPxX(centerX, containerWidth);
-  
-  // If within 20% of a column width from center, snap to center
-  const snapThreshold = colWidth(containerWidth) * 0.3;
-  if (Math.abs(px - centerPx) < snapThreshold) {
-    return centerX;
-  }
-  
-  // Otherwise snap to nearest integer grid position
   const snapped = Math.round(rawX);
   return clampGridX(snapped, w);
 }
