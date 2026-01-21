@@ -656,12 +656,13 @@ export function PageEditor({
 
   const getBlockHeightPx = useCallback(
     (block: ContentBlock, widthOverride?: number) => {
+      if (layoutMode === 'free') {
+        return block.layout.h;
+      }
       const ratio = getRatioForBlock(block);
       const effectiveW = widthOverride ?? block.layout.w;
       if (ratio) {
-        return layoutMode === 'free'
-          ? Math.max(80, Math.round(effectiveW / ratio))
-          : ratioToPxH(effectiveW, ratio, containerWidth);
+        return ratioToPxH(effectiveW, ratio, containerWidth);
       }
       return block.layout.h;
     },
@@ -990,14 +991,12 @@ export function PageEditor({
   }, [layoutMode, convertBlocksToFree, setBlocks]);
 
   useEffect(() => {
+    if (layoutMode === 'free') return;
     setBlocks((prev) => {
       let changed = false;
       const next = prev.map((block) => {
         if (block.block_type !== 'vimeo') return block;
-        const nextH =
-          layoutMode === 'free'
-            ? Math.max(80, Math.round(block.layout.w / (16 / 9)))
-            : ratioToPxH(block.layout.w, 16 / 9, containerWidth);
+        const nextH = ratioToPxH(block.layout.w, 16 / 9, containerWidth);
         if (block.layout.h === nextH) return block;
         changed = true;
         return { ...block, layout: { ...block.layout, h: nextH } };
@@ -1009,6 +1008,7 @@ export function PageEditor({
 
   useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
+    if (layoutMode === 'free') return;
     setBlocks((prev) => {
       let changed = false;
       const next = prev.map((block) => {
@@ -1029,10 +1029,7 @@ export function PageEditor({
           return block;
         }
         imageRatioRef.current[block.layout.i] = ratio;
-        const newH =
-          layoutMode === 'free'
-            ? Math.max(80, Math.round(block.layout.w / ratio))
-            : ratioToPxH(block.layout.w, ratio, containerWidth);
+        const newH = ratioToPxH(block.layout.w, ratio, containerWidth);
         if (block.layout.h !== newH) {
           changed = true;
           normalizedImageLayoutsRef.current.add(block.layout.i);
@@ -1781,11 +1778,12 @@ export function PageEditor({
                           layoutMode === 'snap'
                             ? pxToGridW(nextWidthPx, containerWidth)
                             : Math.max(80, nextWidthPx);
-                        const nextH = ratio
-                          ? layoutMode === 'snap'
-                            ? ratioToPxH(nextW, ratio, containerWidth)
-                            : Math.max(80, Math.round(nextW / ratio))
-                          : Math.max(80, ref.offsetHeight);
+                        const nextH =
+                          ratio
+                            ? layoutMode === 'snap'
+                              ? ratioToPxH(nextW, ratio, containerWidth)
+                              : Math.max(80, Math.round(nextW / ratio))
+                            : Math.max(80, ref.offsetHeight);
                         let nextX = isSingleColumn
                           ? 0
                           : layoutMode === 'snap'
