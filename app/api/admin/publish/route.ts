@@ -68,6 +68,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: draftBlocksError.message }, { status: 500 });
   }
 
+  const seenLayouts = new Set<string>();
+  const dedupedBlocks: any[] = [];
+  const duplicateIds: string[] = [];
+
+  (draftBlocks || []).forEach((block: any) => {
+    const layoutKey = String(block.layout?.i ?? block.id);
+    if (seenLayouts.has(layoutKey)) {
+      duplicateIds.push(block.id);
+      return;
+    }
+    seenLayouts.add(layoutKey);
+    dedupedBlocks.push(block);
+  });
+
+  if (duplicateIds.length > 0) {
+    await supabase.from('content_blocks_drafts').delete().in('id', duplicateIds);
+  }
+
   // Replace live blocks
   const { error: deleteError } = await supabase
     .from('content_blocks')
@@ -78,11 +96,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 });
   }
 
-  if (draftBlocks?.length) {
+  if (dedupedBlocks.length) {
     const { error: insertError } = await supabase
       .from('content_blocks')
       .insert(
-        draftBlocks.map((block: any) => ({
+        dedupedBlocks.map((block: any) => ({
           page_id: livePageId,
           block_type: block.block_type,
           content: block.content,

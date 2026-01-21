@@ -1264,6 +1264,12 @@ export function PageEditor({
   const handlePublish = useCallback(async () => {
     if (!draftMode) return;
     try {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      if (saveStatus !== 'saved' || isSavingSyncRef.current) {
+        await performSave();
+      }
       const response = await fetch('/api/admin/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1285,7 +1291,7 @@ export function PageEditor({
     } catch (error) {
       console.error('Failed to publish:', error);
     }
-  }, [draftMode, page.slug, editOnPublic, exitHref, router]);
+  }, [draftMode, page.slug, editOnPublic, exitHref, router, saveStatus, performSave]);
 
   const handleCreateProject = useCallback(async () => {
     const title = window.prompt('Project title');
