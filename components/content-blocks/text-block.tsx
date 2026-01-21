@@ -15,7 +15,10 @@ interface TextBlockProps {
 function handlePlainTextPaste(e: React.ClipboardEvent) {
   e.preventDefault();
   const text = e.clipboardData.getData('text/plain');
-  document.execCommand('insertText', false, text);
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return;
+  selection.deleteFromDocument();
+  selection.getRangeAt(0).insertNode(document.createTextNode(text));
 }
 
 // Paste with allowed formatting (bold, italic, underline, links)
@@ -67,9 +70,20 @@ function handleFormattedPaste(e: React.ClipboardEvent) {
     };
     
     walk(temp);
-    document.execCommand('insertHTML', false, temp.innerHTML);
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const fragment = range.createContextualFragment(temp.innerHTML);
+    range.insertNode(fragment);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
   } else {
-    document.execCommand('insertText', false, text);
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    selection.deleteFromDocument();
+    selection.getRangeAt(0).insertNode(document.createTextNode(text));
   }
 }
 
@@ -85,6 +99,13 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
             dir="ltr"
             contentEditable={isEditing}
             suppressContentEditableWarning
+            onInput={(e) => {
+              if (!onChange) return;
+              onChange({
+                ...content,
+                header: e.currentTarget.textContent || '',
+              });
+            }}
             onBlur={(e) => {
               if (!onChange) return;
               onChange({
@@ -105,6 +126,13 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
             dir="ltr"
             contentEditable={isEditing}
             suppressContentEditableWarning
+            onInput={(e) => {
+              if (!onChange) return;
+              onChange({
+                ...content,
+                description: e.currentTarget.innerHTML || '',
+              });
+            }}
             onBlur={(e) => {
               if (!onChange) return;
               onChange({

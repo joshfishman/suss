@@ -1657,6 +1657,14 @@ export function PageEditor({
                       size={{ width: widthPx, height: heightPx }}
                       position={{ x: xPx, y: yPx }}
                       lockAspectRatio={ratio ?? false}
+                      resizeHandleWrapperStyle={{ zIndex: 80 }}
+                      resizeHandleStyles={{
+                        right: { width: '12px', right: '-6px' },
+                        left: { width: '12px', left: '-6px' },
+                        bottom: { height: '12px', bottom: '-6px' },
+                        bottomRight: { width: '14px', height: '14px', right: '-7px', bottom: '-7px' },
+                        bottomLeft: { width: '14px', height: '14px', left: '-7px', bottom: '-7px' },
+                      }}
                       style={{
                         zIndex:
                           draggingBlockId === block.id ? 60 : Math.max(1, 40 - Math.round(yPx / 10)),
@@ -1697,8 +1705,8 @@ export function PageEditor({
                               bottom: block.block_type !== 'text',
                               left: true,
                               topRight: false,
-                              bottomRight: false,
-                              bottomLeft: false,
+                              bottomRight: true,
+                              bottomLeft: true,
                               topLeft: false,
                             }
                           : false
