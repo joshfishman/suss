@@ -16,7 +16,7 @@ A minimalist portfolio website inspired by [onecrew.tv](https://onecrew.tv/) wit
 
 ## Pages
 
-- **Home** (`/home`) - Landing page
+- **Home** (`/`) - Landing page
 - **About** (`/about`) - About page
 - **Projects** (`/projects`) - Projects gallery page
 - **Admin** (`/admin`) - Content management dashboard (auth required)

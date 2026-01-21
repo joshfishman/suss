@@ -11,7 +11,7 @@ export function SiteHeader() {
   const [projects, setProjects] = useState<{ id: string; slug: string; title: string }[]>([]);
 
   const links = [
-    { href: '/home', label: 'Home' },
+    { href: '/', label: 'Home' },
     { href: '/about', label: 'About' },
   ];
 
@@ -43,7 +43,7 @@ export function SiteHeader() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-black">
       <nav className="container mx-auto px-8 py-6">
         <div className="flex items-center justify-between">
-          <Link href="/home" className="text-2xl font-extralight tracking-widest text-white uppercase">
+          <Link href="/" className="text-2xl font-extralight tracking-widest text-white uppercase">
             the Suss
           </Link>
           
@@ -72,20 +72,22 @@ export function SiteHeader() {
                     : 'opacity-60'
                 )}
               >
-                Projects
+                PROJECTS
               </Link>
               {projects.length > 0 && (
-                <div className="absolute left-0 mt-3 min-w-[220px] rounded-md border border-white/10 bg-black/95 shadow-lg opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto">
-                  <div className="py-2">
-                    {projects.map((project) => (
-                      <Link
-                        key={project.id}
-                        href={`/${project.slug}`}
-                        className="block px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5"
-                      >
-                        {project.title}
-                      </Link>
-                    ))}
+                <div className="absolute left-0 top-full pt-3 min-w-[220px] opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+                  <div className="rounded-md border border-white/10 bg-black/95 shadow-lg">
+                    <div className="py-2">
+                      {projects.map((project) => (
+                        <Link
+                          key={project.id}
+                          href={`/${project.slug}`}
+                          className="block px-4 py-2 text-sm uppercase text-white/80 hover:text-white hover:bg-white/5"
+                        >
+                          {project.title}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

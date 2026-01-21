@@ -1,12 +1,5 @@
 import { redirect } from 'next/navigation';
-
-function isEditMode(searchParams?: { edit?: string | string[] }) {
-  const editParam = searchParams?.edit;
-  if (Array.isArray(editParam)) {
-    return editParam.includes('1') || editParam.includes('true');
-  }
-  return editParam === '1' || editParam === 'true';
-}
+import { isEditMode } from '@/lib/route-helpers';
 
 export default async function ProjectPage({
   params,

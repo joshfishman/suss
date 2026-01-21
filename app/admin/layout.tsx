@@ -8,7 +8,7 @@ async function AuthCheck({ children }: { children: React.ReactNode }) {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/login?next=%2Fadmin');
   }
 
   return <>{children}</>;

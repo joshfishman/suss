@@ -1,17 +1,26 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { getPageData } from '@/lib/drafts';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const supabase = await createClient();
   const url = new URL(request.url);
   const draftMode = url.searchParams.get('draft') === '1';
-  
+
+  if (!draftMode) {
+    const { page, blocks } = await getPageData(slug, false);
+    if (!page) {
+      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+    }
+    return NextResponse.json({ page, blocks });
+  }
+
+  const supabase = await createClient();
   const { data: page, error: pageError } = await supabase
-    .from(draftMode ? 'pages_drafts' : 'pages')
+    .from('pages_drafts')
     .select('*')
     .eq('slug', slug)
     .single();
@@ -21,9 +30,9 @@ export async function GET(
   }
 
   const { data: blocks, error: blocksError } = await supabase
-    .from(draftMode ? 'content_blocks_drafts' : 'content_blocks')
+    .from('content_blocks_drafts')
     .select('*')
-    .eq(draftMode ? 'page_draft_id' : 'page_id', page.id)
+    .eq('page_draft_id', page.id)
     .order('sort_order', { ascending: true });
 
   if (blocksError) {

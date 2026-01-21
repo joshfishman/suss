@@ -11,7 +11,7 @@ export function SiteFooter() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           {/* Brand */}
           <div>
-            <Link href="/home" className="text-2xl font-extralight tracking-widest uppercase">
+            <Link href="/" className="text-2xl font-extralight tracking-widest uppercase">
               the Suss
             </Link>
             <p className="mt-4 text-sm text-gray-400 font-light leading-relaxed">
@@ -24,7 +24,7 @@ export function SiteFooter() {
           <div>
             <h3 className="text-sm font-medium uppercase tracking-wider mb-4">Navigation</h3>
             <nav className="flex flex-col gap-2">
-              <Link href="/home" className="text-sm text-gray-400 hover:text-white transition-colors">
+              <Link href="/" className="text-sm text-gray-400 hover:text-white transition-colors">
                 Home
               </Link>
               <Link href="/about" className="text-sm text-gray-400 hover:text-white transition-colors">

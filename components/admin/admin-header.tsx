@@ -16,7 +16,7 @@ export function AdminHeader({ userEmail }: AdminHeaderProps) {
             <Link href="/admin" className="text-xl font-bold text-white">
               Admin Panel
             </Link>
-            <Link href="/home" className="text-sm text-gray-400 hover:text-white">
+            <Link href="/" className="text-sm text-gray-400 hover:text-white">
               View Site
             </Link>
           </div>

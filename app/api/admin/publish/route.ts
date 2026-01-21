@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -98,6 +99,9 @@ export async function POST(request: Request) {
   // Clear drafts after publish
   await supabase.from('content_blocks_drafts').delete().eq('page_draft_id', draftPage.id);
   await supabase.from('pages_drafts').delete().eq('id', draftPage.id);
+
+  revalidateTag(`page:${slug}`);
+  revalidateTag('projects');
 
   return NextResponse.json({ success: true });
 }

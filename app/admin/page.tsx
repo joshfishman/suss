@@ -7,9 +7,9 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-    redirect('/auth/login');
+    redirect('/auth/login?next=%2Fadmin');
   }
 
   // Redirect authenticated users to home in edit mode
-  redirect('/home?edit=1');
+  redirect('/?edit=1');
 }

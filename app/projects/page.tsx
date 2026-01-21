@@ -3,14 +3,22 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { PageEditor } from '@/components/admin/page-editor';
 import { getPageData } from '@/lib/drafts';
+import type { Metadata } from 'next';
+import { buildSearchString, isEditMode } from '@/lib/route-helpers';
 
-async function PageContent({ editMode }: { editMode: boolean }) {
+async function PageContent({
+  editMode,
+  loginRedirectTo,
+}: {
+  editMode: boolean;
+  loginRedirectTo: string;
+}) {
   const supabase = await createClient();
 
   if (editMode) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      redirect('/auth/login');
+      redirect(`/auth/login?next=${encodeURIComponent(loginRedirectTo)}`);
     }
   }
 
@@ -41,12 +49,30 @@ async function PageContent({ editMode }: { editMode: boolean }) {
   );
 }
 
-function isEditMode(searchParams?: { edit?: string | string[] }) {
-  const editParam = searchParams?.edit;
-  if (Array.isArray(editParam)) {
-    return editParam.includes('1') || editParam.includes('true');
+export async function generateMetadata(): Promise<Metadata> {
+  const { page } = await getPageData('projects', false);
+
+  if (!page) {
+    return {};
   }
-  return editParam === '1' || editParam === 'true';
+
+  const title = page.title;
+  const description = page.description;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+  };
 }
 
 export default async function ProjectsPage({
@@ -56,18 +82,19 @@ export default async function ProjectsPage({
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const editMode = isEditMode(resolvedSearchParams);
+  const loginRedirectTo = `/projects${buildSearchString(resolvedSearchParams)}`;
 
   if (editMode) {
     return (
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-        <PageContent editMode />
+        <PageContent editMode loginRedirectTo={loginRedirectTo} />
       </Suspense>
     );
   }
 
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-      <PageContent editMode={false} />
+      <PageContent editMode={false} loginRedirectTo={loginRedirectTo} />
     </Suspense>
   );
 }

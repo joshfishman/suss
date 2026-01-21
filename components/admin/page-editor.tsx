@@ -1058,7 +1058,7 @@ export function PageEditor({
       }
 
       // Navigate to home after deletion
-      router.push('/home?edit=1');
+      router.push('/?edit=1');
     } catch (error) {
       console.error('Failed to delete page:', error);
       window.alert('Failed to delete page. Check console for details.');
@@ -1448,16 +1448,6 @@ export function PageEditor({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              {draftMode && (
-                <Button
-                  onClick={handlePublish}
-                  variant="outline"
-                  size="sm"
-                  className="border-green-600 text-green-300 hover:bg-green-900/30"
-                >
-                  Publish
-                </Button>
-              )}
               <Button
                 onClick={handleClearBlocks}
                 variant="outline"
@@ -1506,6 +1496,16 @@ export function PageEditor({
                   Preview
                 </Button>
               </Link>
+              {draftMode && (
+                <Button
+                  onClick={handlePublish}
+                  variant="outline"
+                  size="sm"
+                  className="border-green-600 text-green-300 hover:bg-green-900/30"
+                >
+                  Publish
+                </Button>
+              )}
               <div className="flex items-center gap-2 text-sm">
                 {saveStatus === 'saving' && (
                   <>

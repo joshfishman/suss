@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { ContentBlock, Page } from '@/lib/types/content';
+import { unstable_cache } from 'next/cache';
+import { createPublicClient } from '@/lib/supabase/public';
 
 interface DraftPage extends Page {
   published_page_id?: string | null;
@@ -121,30 +123,37 @@ async function ensureDrafts(slug: string) {
 }
 
 export async function getPageData(slug: string, draftMode: boolean) {
-  const supabase = await createClient();
-
   if (draftMode) {
     return ensureDrafts(slug);
   }
 
-  const { data: page } = await supabase
-    .from('pages')
-    .select('*')
-    .eq('slug', slug)
-    .single();
+  const getCachedLivePageData = unstable_cache(
+    async () => {
+      const supabase = createPublicClient();
+      const { data: page } = await supabase
+        .from('pages')
+        .select('*')
+        .eq('slug', slug)
+        .single();
 
-  if (!page) {
-    return { page: null, blocks: [] as ContentBlock[] };
-  }
+      if (!page) {
+        return { page: null, blocks: [] as ContentBlock[] };
+      }
 
-  const { data: blocks } = await supabase
-    .from('content_blocks')
-    .select('*')
-    .eq('page_id', page.id)
-    .order('sort_order', { ascending: true });
+      const { data: blocks } = await supabase
+        .from('content_blocks')
+        .select('*')
+        .eq('page_id', page.id)
+        .order('sort_order', { ascending: true });
 
-  return {
-    page: page as Page,
-    blocks: (blocks || []) as ContentBlock[],
-  };
+      return {
+        page: page as Page,
+        blocks: (blocks || []) as ContentBlock[],
+      };
+    },
+    ['page-data', slug],
+    { tags: [`page:${slug}`] }
+  );
+
+  return getCachedLivePageData();
 }

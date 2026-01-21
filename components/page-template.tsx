@@ -1,6 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
+import { PageTransition } from '@/components/page-transition';
 
 interface PageTemplateProps {
   readOnly?: boolean;
@@ -11,7 +12,7 @@ interface PageTemplateProps {
 
 export function PageTemplate({ readOnly = false, hero, content, contentRef }: PageTemplateProps) {
   return (
-    <>
+    <PageTransition>
       <SiteHeader />
       <main className={`${readOnly ? 'pt-20' : 'pt-32'} flex-1`}>
         <section className="py-20 px-8">
@@ -22,6 +23,6 @@ export function PageTemplate({ readOnly = false, hero, content, contentRef }: Pa
         </div>
       </main>
       <SiteFooter />
-    </>
+    </PageTransition>
   );
 }
