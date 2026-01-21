@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { HeaderContent } from '@/lib/types/content';
 
 interface HeaderBlockProps {
@@ -85,6 +86,21 @@ function handleFormattedPaste(e: React.ClipboardEvent) {
 }
 
 export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBlockProps) {
+  const headerRef = useRef<HTMLHeadingElement | null>(null);
+  const descriptionRef = useRef<HTMLParagraphElement | null>(null);
+  const headerFocusedRef = useRef(false);
+  const descriptionFocusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!headerRef.current || headerFocusedRef.current) return;
+    headerRef.current.textContent = content.header || '';
+  }, [content.header]);
+
+  useEffect(() => {
+    if (!descriptionRef.current || descriptionFocusedRef.current) return;
+    descriptionRef.current.innerHTML = content.description || '';
+  }, [content.description]);
+
   return (
     <div
       className={`relative w-full h-full flex flex-col justify-center p-6 bg-black text-white transition-colors ${isEditing ? 'group hover:bg-zinc-950' : ''}`}
@@ -92,6 +108,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
     >
       {(content.header || isEditing) && (
         <h3
+          ref={headerRef}
           dir="ltr"
           contentEditable={isEditing}
           suppressContentEditableWarning
@@ -103,6 +120,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
             });
           }}
           onBlur={(e) => {
+            headerFocusedRef.current = false;
             if (!onChange) return;
             onChange({
               ...content,
@@ -111,14 +129,16 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
           }}
           onPaste={handlePlainTextPaste}
           onMouseDown={(e) => isEditing && e.stopPropagation()}
+          onFocus={() => {
+            headerFocusedRef.current = true;
+          }}
           className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded px-2 -mx-2 text-left transition-colors whitespace-pre-wrap ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900' : ''}`}
           data-placeholder="Header"
-        >
-          {content.header || ''}
-        </h3>
+        />
       )}
       {(content.description || isEditing) && (
         <p
+          ref={descriptionRef}
           dir="ltr"
           contentEditable={isEditing}
           suppressContentEditableWarning
@@ -130,6 +150,7 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
             });
           }}
           onBlur={(e) => {
+            descriptionFocusedRef.current = false;
             if (!onChange) return;
             onChange({
               ...content,
@@ -138,9 +159,11 @@ export function HeaderBlock({ content, isEditing = false, onChange }: HeaderBloc
           }}
           onPaste={handleFormattedPaste}
           onMouseDown={(e) => isEditing && e.stopPropagation()}
+          onFocus={() => {
+            descriptionFocusedRef.current = true;
+          }}
           className={`text-base md:text-lg text-white/70 outline-none rounded px-2 -mx-2 text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900' : ''} ${content.header || isEditing ? 'mt-4' : ''}`}
           data-placeholder="Description"
-          dangerouslySetInnerHTML={{ __html: content.description || '' }}
         />
       )}
       {isEditing && (
