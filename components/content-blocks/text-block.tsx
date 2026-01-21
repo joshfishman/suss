@@ -115,7 +115,7 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
             }}
             onPaste={handlePlainTextPaste}
             onMouseDown={(e) => isEditing && e.stopPropagation()}
-            className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded text-left transition-colors ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900 px-2 -mx-2' : ''}`}
+            className={`text-3xl md:text-5xl font-extralight tracking-tight outline-none rounded text-left transition-colors whitespace-pre-wrap ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900 px-2 -mx-2' : ''}`}
             data-placeholder="Header"
           >
             {content.header || ''}
@@ -142,7 +142,7 @@ export function TextBlock({ content, isEditing = false, onChange, measureRef }: 
             }}
             onPaste={handleFormattedPaste}
             onMouseDown={(e) => isEditing && e.stopPropagation()}
-            className={`text-base md:text-lg text-white/70 outline-none rounded text-left transition-colors [&_a]:underline [&_a]:text-white/90 ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900 px-2 -mx-2' : ''} ${content.header || isEditing ? 'mt-4' : ''}`}
+            className={`text-base md:text-lg text-white/70 outline-none rounded text-left transition-colors [&_a]:underline [&_a]:text-white/90 whitespace-pre-wrap ${isEditing ? 'cursor-text hover:bg-zinc-900 focus:bg-zinc-900 px-2 -mx-2' : ''} ${content.header || isEditing ? 'mt-4' : ''}`}
             data-placeholder="Description"
             dangerouslySetInnerHTML={{ __html: content.description || '' }}
           />

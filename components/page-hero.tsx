@@ -16,7 +16,10 @@ interface PageHeroProps {
 function handlePlainTextPaste(e: React.ClipboardEvent) {
   e.preventDefault();
   const text = e.clipboardData.getData('text/plain');
-  document.execCommand('insertText', false, text);
+  const selection = window.getSelection();
+  if (!selection?.rangeCount) return;
+  selection.deleteFromDocument();
+  selection.getRangeAt(0).insertNode(document.createTextNode(text));
 }
 
 export function PageHero({
@@ -37,18 +40,16 @@ export function PageHero({
         dir="ltr"
         contentEditable={isEditing}
         suppressContentEditableWarning
+        onInput={(e) => {
+          if (!onTitleChange) return;
+          onTitleChange(e.currentTarget.textContent || '');
+        }}
         onBlur={(e) => {
           if (!onTitleChange) return;
           onTitleChange(e.currentTarget.textContent || '');
         }}
         onPaste={handlePlainTextPaste}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            (e.currentTarget as HTMLElement).blur();
-          }
-        }}
-        className={`text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none ${
+        className={`text-5xl md:text-7xl font-extralight tracking-tight mb-6 outline-none whitespace-pre-wrap ${
           isEditing ? 'hover:bg-zinc-900 focus:bg-zinc-900 rounded px-2 -mx-2 transition-colors cursor-text text-left' : ''
         }`}
         data-placeholder={isEditing ? 'Page Title' : undefined}
@@ -61,12 +62,16 @@ export function PageHero({
           dir="ltr"
           contentEditable={isEditing}
           suppressContentEditableWarning
+          onInput={(e) => {
+            if (!onDescriptionChange) return;
+            onDescriptionChange(e.currentTarget.textContent || '');
+          }}
           onBlur={(e) => {
             if (!onDescriptionChange) return;
             onDescriptionChange(e.currentTarget.textContent || '');
           }}
           onPaste={handlePlainTextPaste}
-          className={`text-lg md:text-xl font-light leading-relaxed max-w-2xl outline-none ${
+          className={`text-lg md:text-xl font-light leading-relaxed max-w-2xl outline-none whitespace-pre-wrap ${
             isEditing
               ? 'text-white/70 hover:bg-zinc-900 focus:bg-zinc-900 rounded px-2 -mx-2 transition-colors cursor-text text-left'
               : 'text-muted-foreground'
