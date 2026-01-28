@@ -752,14 +752,29 @@ export function PageEditor({
     }
     if (block.block_type === 'image') {
       const content = block.content as { url?: string };
-      if (!content?.url) return imageRatioRef.current[block.layout.i] || 1;
+      // Try cached ratio first
+      const cachedRatio = imageRatioRef.current[block.layout.i];
+      if (!content?.url) return cachedRatio || 1;
       const size = measuredSizes[content.url];
-      if (!size) return imageRatioRef.current[block.layout.i] || 1;
+      if (!size) {
+        // No measured size - use cached ratio or calculate from stored dimensions
+        if (cachedRatio) return cachedRatio;
+        // Calculate ratio from stored block dimensions (w/h) if they look like pixels
+        if (block.layout.w > GRID_COLS && block.layout.h > 0) {
+          const impliedRatio = block.layout.w / block.layout.h;
+          if (Number.isFinite(impliedRatio) && impliedRatio > 0) {
+            imageRatioRef.current[block.layout.i] = impliedRatio;
+            return impliedRatio;
+          }
+        }
+        return 1;
+      }
       const ratio =
         size.width > 0 && size.height > 0 ? size.width / size.height : NaN;
       if (!Number.isFinite(ratio)) {
-        return imageRatioRef.current[block.layout.i] || 1;
+        return cachedRatio || 1;
       }
+      imageRatioRef.current[block.layout.i] = ratio;
       return ratio;
     }
     return null;
@@ -771,7 +786,9 @@ export function PageEditor({
         return block.layout.h;
       }
       const ratio = getRatioForBlock(block);
-      const effectiveW = widthOverride ?? block.layout.w;
+      const rawW = widthOverride ?? block.layout.w;
+      // If width is in pixels (> GRID_COLS), convert to grid units first
+      const effectiveW = rawW > GRID_COLS ? pxToGridW(rawW, containerWidth) : rawW;
       if (ratio) {
         return ratioToPxH(effectiveW, ratio, containerWidth);
       }
@@ -1144,19 +1161,44 @@ export function PageEditor({
     didConvertFreeLayoutRef.current = false;
   }, [layoutMode, convertBlocksToFree, setBlocks]);
 
+  // Normalize blocks to grid units when in snap mode (handles blocks loaded with pixel values)
   useEffect(() => {
-    if (layoutMode === 'free') return;
+    if (layoutMode !== 'snap') return;
+    if (!containerWidth) return;
     setBlocks((prev) => {
       let changed = false;
       const next = prev.map((block) => {
-        if (block.block_type !== 'vimeo') return block;
-        const nextH = ratioToPxH(block.layout.w, 16 / 9, containerWidth);
-        if (block.layout.h === nextH) return block;
+        // Check if block has pixel width (> GRID_COLS means it's in pixels)
+        if (block.layout.w <= GRID_COLS) return block;
+        
+        // Convert pixel width to grid units
+        const nextW = pxToGridW(block.layout.w, containerWidth);
+        const nextX = clampGridX(pxToGridX(block.layout.x, containerWidth), nextW);
+        
+        // Calculate ratio inline to avoid dependency issues
+        let ratio: number | null = null;
+        if (block.block_type === 'vimeo') {
+          ratio = 16 / 9;
+        } else if (block.block_type === 'image') {
+          // Use stored dimensions to calculate ratio since we know w/h are in pixels
+          ratio = block.layout.h > 0 ? block.layout.w / block.layout.h : 1;
+        }
+        
+        const nextH = ratio ? ratioToPxH(nextW, ratio, containerWidth) : block.layout.h;
+        
         changed = true;
-        return { ...block, layout: { ...block.layout, h: nextH } };
+        return {
+          ...block,
+          layout: {
+            ...block.layout,
+            x: nextX,
+            w: nextW,
+            h: nextH,
+          },
+        };
       });
       if (!changed) return prev;
-      return layoutMode === 'snap' ? packMasonry(next) : next;
+      return packMasonry(next);
     });
   }, [containerWidth, layoutMode, packMasonry]);
 
@@ -1191,7 +1233,6 @@ export function PageEditor({
     if (layoutMode === 'free') return;
     setBlocks((prev) => {
       let changed = false;
-      const updates: { id: string; prevH: number; nextH: number }[] = [];
       const next = prev.map((block) => {
         if (block.block_type !== 'image') return block;
         const content = block.content as { url?: string };
@@ -1210,11 +1251,12 @@ export function PageEditor({
           return block;
         }
         imageRatioRef.current[block.layout.i] = ratio;
-        const newH = ratioToPxH(block.layout.w, ratio, containerWidth);
+        // Convert pixel width to grid units if needed
+        const effectiveW = block.layout.w > GRID_COLS ? pxToGridW(block.layout.w, containerWidth) : block.layout.w;
+        const newH = ratioToPxH(effectiveW, ratio, containerWidth);
         if (block.layout.h !== newH) {
           changed = true;
           normalizedImageLayoutsRef.current.add(block.layout.i);
-          updates.push({ id: block.id, prevH: block.layout.h, nextH: newH });
           return {
             ...block,
             layout: { ...block.layout, h: newH },
@@ -1720,35 +1762,6 @@ export function PageEditor({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <div className="flex items-center gap-2 ml-2">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wide text-white/70 text-center">Grid Layout</span>
-                  <div className="inline-flex rounded-full border border-gray-700 overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => layoutMode !== 'snap' && handleToggleLayoutMode()}
-                      className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
-                        layoutMode === 'snap'
-                          ? 'bg-white text-black'
-                          : 'text-white/70 hover:text-white'
-                      }`}
-                    >
-                      Snap
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => layoutMode !== 'free' && handleToggleLayoutMode()}
-                      className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
-                        layoutMode === 'free'
-                          ? 'bg-white text-black'
-                          : 'text-white/70 hover:text-white'
-                      }`}
-                    >
-                      Free
-                    </button>
-                  </div>
-                </div>
-              </div>
               <div className="w-px h-6 bg-gray-700 mx-2" />
               <Button
                 onClick={handleClearBlocks}
