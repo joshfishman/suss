@@ -32,6 +32,11 @@ export function ImageBlock({ content, isEditing = false }: ImageBlockProps) {
         src={content.url}
         alt={content.alt || ''}
         className="w-full h-auto object-contain"
+        onError={(event) => {
+          const target = event.currentTarget;
+          const message = target?.src ? `Image failed to load: ${target.src}` : 'Image failed to load';
+          console.warn(message);
+        }}
       />
       {content.caption && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm">

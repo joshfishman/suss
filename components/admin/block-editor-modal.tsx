@@ -19,8 +19,10 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
   const [content, setContent] = useState(block.content);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'upload' | 'existing'>(initialTab);
-  const [existingImages, setExistingImages] = useState<{ url: string; name: string }[]>([]);
+  const [existingImages, setExistingImages] = useState<{ url: string; name: string; path?: string }[]>([]);
   const [loadingImages, setLoadingImages] = useState(false);
+  const [imagesError, setImagesError] = useState<string | null>(null);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
 
   const onDrop = async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0 || block.block_type !== 'image') return;
@@ -36,7 +38,7 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
       });
       
       const data = await response.json();
-      setContent({ ...content, url: data.url } as ImageContent);
+      setContent({ ...content, url: data.url, path: data.path } as ImageContent);
     } catch (error) {
       console.error('Upload failed:', error);
     } finally {
@@ -53,25 +55,37 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
   useEffect(() => {
     if (block.block_type !== 'image') return;
     if (activeTab !== 'existing') return;
-    if (existingImages.length > 0) return;
+    if (imagesLoaded) return;
 
     const loadImages = async () => {
       setLoadingImages(true);
+      setImagesError(null);
       try {
         const response = await fetch('/api/admin/list-images');
-        const data = await response.json();
-        if (response.ok && data.images) {
-          setExistingImages(data.images);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          setImagesError(errorData.error || `Failed to load images (${response.status})`);
+          setImagesLoaded(true);
+          return;
         }
+        const data = await response.json();
+        if (data.images) {
+          // list-images already returns signed URLs, use them directly
+          const items = Array.isArray(data.images) ? data.images : [];
+          setExistingImages(items);
+        }
+        setImagesLoaded(true);
       } catch (error) {
         console.error('Failed to load images:', error);
+        setImagesError('Failed to load images. Check console for details.');
+        setImagesLoaded(true);
       } finally {
         setLoadingImages(false);
       }
     };
 
     loadImages();
-  }, [activeTab, block.block_type, existingImages.length]);
+  }, [activeTab, block.block_type, imagesLoaded]);
 
   const handleSave = () => {
     onSave({ ...block, content });
@@ -116,17 +130,32 @@ export function BlockEditorModal({ block, onSave, onClose, initialTab = 'upload'
                 {loadingImages && (
                   <p className="text-sm text-gray-400">Loading images...</p>
                 )}
-                {!loadingImages && existingImages.length === 0 && (
+                {!loadingImages && imagesError && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-red-400">{imagesError}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImagesLoaded(false);
+                        setImagesError(null);
+                      }}
+                      className="text-sm text-blue-400 hover:text-blue-300 underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+                {!loadingImages && !imagesError && existingImages.length === 0 && (
                   <p className="text-sm text-gray-400">No images yet. Upload one first.</p>
                 )}
-                {!loadingImages && existingImages.length > 0 && (
+                {!loadingImages && !imagesError && existingImages.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-56 overflow-y-auto pr-1">
                     {existingImages.map((image) => (
                       <button
                         key={image.url}
                         type="button"
                         onClick={() => {
-                          const nextContent = { ...imageContent, url: image.url };
+                          const nextContent = { ...imageContent, url: image.url, path: image.path };
                           setContent(nextContent);
                           onSave({ ...block, content: nextContent });
                         }}

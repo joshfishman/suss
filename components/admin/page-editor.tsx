@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { Rnd } from 'react-rnd';
-import { Page, ContentBlock, LayoutMode } from '@/lib/types/content';
+import { Page, ContentBlock, LayoutMode, ImageContent } from '@/lib/types/content';
 import {
   GRID_COLS,
   GRID_GAP,
@@ -183,6 +183,7 @@ export function PageEditor({
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [editingBlock, setEditingBlock] = useState<ContentBlock | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
+  const [freeCanvasHeight, setFreeCanvasHeight] = useState(0);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(page.layout_mode || 'snap');
   const [projectPreviews, setProjectPreviews] = useState<
     { id: string; slug: string; title: string; first_block: ContentBlock | null }[]
@@ -224,6 +225,9 @@ export function PageEditor({
   const measuredSizesRef = useRef<Record<string, { width: number; height: number }>>({});
   const lastImageUrlByLayoutRef = useRef<Record<string, string>>({});
   const imageRatioRef = useRef<Record<string, number>>({});
+  const lastSnapLayoutsRef = useRef<Record<string, ContentBlock['layout']>>({});
+  const freeLayoutSeedRef = useRef<Record<string, ContentBlock['layout']>>({});
+  const signedUrlCacheRef = useRef<Record<string, { url: string; expiresAt: number }>>({});
   const isSingleColumn = containerWidth < 640;
   const textResizeObserverRef = useRef<ResizeObserver | null>(null);
   const textBlockIdsByElRef = useRef(new Map<Element, string>());
@@ -391,6 +395,20 @@ export function PageEditor({
       })
       .filter((item): item is ImageItem => Boolean(item));
   }, [blocks]);
+
+  const imageContentSignature = useMemo(() => {
+    const signature = blocks
+      .filter((block) => block.block_type === 'image')
+      .map((block) => {
+        const content = block.content as ImageContent;
+        return { id: block.id, url: content.url, path: content.path };
+      });
+    return JSON.stringify(signature);
+  }, [blocks]);
+
+  const imageBlocks = useMemo(() => {
+    return blocks.filter((block) => block.block_type === 'image');
+  }, [imageContentSignature]);
 
   const blocksHash = useMemo(() => JSON.stringify(blocks), [blocks]);
 
@@ -634,6 +652,98 @@ export function PageEditor({
   }, [title, heroTitle, description, layoutMode, blocksHash, performSave, readOnly]);
 
   // No aspect ratio tracking (simplified editor)
+
+  const extractImagePath = useCallback((url: string) => {
+    const marker = 'page-images/';
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    const after = url.slice(idx + marker.length);
+    const [rawPath] = after.split('?');
+    return decodeURIComponent(rawPath);
+  }, []);
+
+  useEffect(() => {
+    if (imageBlocks.length === 0) return;
+    let cancelled = false;
+    const SIGNED_URL_TTL_MS = 55 * 60 * 1000;
+
+    const ensureImageUrls = async () => {
+      const updates = new Map<string, ImageContent>();
+
+      await Promise.all(
+        imageBlocks.map(async (block) => {
+          const content = block.content as ImageContent;
+          let path = content.path;
+          if (!path && content.url) {
+            const derived = extractImagePath(content.url);
+            if (derived) {
+              path = derived;
+            }
+          }
+          const shouldStorePath = Boolean(path && path !== content.path);
+          if (!path) {
+            if (shouldStorePath) {
+            updates.set(block.id, { ...content, url: content.url || '', path });
+            }
+            return;
+          }
+
+          const cached = signedUrlCacheRef.current[path];
+          const now = Date.now();
+          const hasValidCache = cached && cached.expiresAt > now;
+          let nextUrl = content.url;
+
+          if (hasValidCache) {
+            nextUrl = cached.url;
+          } else {
+            try {
+              const signedResponse = await fetch(
+                `/api/admin/signed-image?path=${encodeURIComponent(path)}`
+              );
+              const signedData = await signedResponse.json();
+              if (signedResponse.ok && signedData.url) {
+                signedUrlCacheRef.current[path] = {
+                  url: signedData.url,
+                  expiresAt: now + SIGNED_URL_TTL_MS,
+                };
+                nextUrl = signedData.url;
+              } else {
+                console.warn('Signed image fetch failed', {
+                  path,
+                  status: signedResponse.status,
+                  error: signedData?.error,
+                });
+              }
+            } catch (error) {
+              console.warn('Signed image fetch error', { path, error });
+            }
+          }
+
+          if (shouldStorePath || (nextUrl && nextUrl !== content.url)) {
+            updates.set(block.id, { ...content, url: nextUrl || content.url || '', path });
+          }
+        })
+      );
+
+      if (cancelled || updates.size === 0) return;
+      setBlocksTransient((prev) => {
+        let changed = false;
+        const next = prev.map((block) => {
+          const update = updates.get(block.id);
+          if (!update) return block;
+          changed = true;
+          return { ...block, content: update };
+        });
+        return changed ? next : prev;
+      });
+    };
+
+    ensureImageUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imageBlocks, imageContentSignature, extractImagePath, setBlocksTransient]);
 
   const getRatioForBlock = useCallback((block: ContentBlock) => {
     if (block.block_type === 'vimeo') {
@@ -891,53 +1001,32 @@ export function PageEditor({
         return { x: 0, y: 0 };
       }
 
-      if (layoutMode === 'free') {
-        const maxBottom = Math.max(
-          ...existingBlocks.map((block) => block.layout.y + getBlockHeightPx(block))
-        );
-        return { x: 0, y: Number.isFinite(maxBottom) ? maxBottom + GRID_GAP : 0 };
-      }
-
-      const normalized = packMasonry(existingBlocks);
-
-      const colHeights = Array.from({ length: GRID_COLS }, () => 0);
-      for (const block of normalized) {
-        const blockH = getBlockHeightPx(block);
-        const bottom = block.layout.y + blockH + GRID_GAP;
-        for (let i = block.layout.x; i < block.layout.x + block.layout.w; i += 1) {
-          colHeights[i] = Math.max(colHeights[i], bottom);
-        }
-      }
-
-      let bestX = 0;
-      let bestY = Number.POSITIVE_INFINITY;
-      for (let x = 0; x <= GRID_COLS - blockW; x += 1) {
-        const spanHeights = colHeights.slice(x, x + blockW);
-        const candidateY = Math.max(...spanHeights);
-        if (candidateY < bestY) {
-          bestY = candidateY;
-          bestX = x;
-        }
-      }
-
-      return { x: bestX, y: Number.isFinite(bestY) ? bestY : 0 };
+      const maxBottom = Math.max(
+        ...existingBlocks.map((block) => block.layout.y + getBlockHeightPx(block))
+      );
+      return { x: 0, y: Number.isFinite(maxBottom) ? maxBottom + GRID_GAP : 0 };
     },
-    [blocks, getBlockHeightPx, layoutMode, packMasonry]
+    [blocks, getBlockHeightPx]
   );
 
   const convertBlocksToFree = useCallback(
     (items: ContentBlock[]) =>
       items.map((block) => {
+        const isGridUnits = block.layout.w <= GRID_COLS;
+        if (!isGridUnits) {
+          return block;
+        }
         const nextW = gridToPxW(block.layout.w, containerWidth);
         const ratio = getRatioForBlock(block);
+        const nextLayout = {
+          ...block.layout,
+          x: gridToPxX(block.layout.x, containerWidth),
+          w: nextW,
+          h: ratio ? Math.max(80, Math.round(nextW / ratio)) : block.layout.h,
+        };
         return {
           ...block,
-          layout: {
-            ...block.layout,
-            x: gridToPxX(block.layout.x, containerWidth),
-            w: nextW,
-            h: ratio ? Math.max(80, Math.round(nextW / ratio)) : block.layout.h,
-          },
+          layout: nextLayout,
         };
       }),
     [containerWidth, getRatioForBlock],
@@ -949,32 +1038,96 @@ export function PageEditor({
         const nextW = pxToGridW(block.layout.w, containerWidth);
         const nextX = clampGridX(pxToGridX(block.layout.x, containerWidth), nextW);
         const ratio = getRatioForBlock(block);
+        const nextLayout = {
+          ...block.layout,
+          x: nextX,
+          w: nextW,
+          h: ratio ? ratioToPxH(nextW, ratio, containerWidth) : block.layout.h,
+        };
         return {
           ...block,
-          layout: {
-            ...block.layout,
-            x: nextX,
-            w: nextW,
-            h: ratio ? ratioToPxH(nextW, ratio, containerWidth) : block.layout.h,
-          },
+          layout: nextLayout,
         };
       }),
     [containerWidth, getRatioForBlock],
   );
+
+  const storeSnapLayouts = useCallback((items: ContentBlock[]) => {
+    lastSnapLayoutsRef.current = items.reduce<Record<string, ContentBlock['layout']>>(
+      (acc, block) => {
+        acc[block.layout.i] = block.layout;
+        return acc;
+      },
+      {}
+    );
+  }, []);
+
+  const storeFreeLayoutsSeed = useCallback((items: ContentBlock[]) => {
+    freeLayoutSeedRef.current = items.reduce<Record<string, ContentBlock['layout']>>(
+      (acc, block) => {
+        acc[block.layout.i] = block.layout;
+        return acc;
+      },
+      {}
+    );
+  }, []);
+
+  const restoreSnapLayouts = useCallback((items: ContentBlock[], currentFree: ContentBlock[]) => {
+    const stored = lastSnapLayoutsRef.current;
+    if (!stored || Object.keys(stored).length === 0) {
+      return items;
+    }
+    const freeSeed = freeLayoutSeedRef.current;
+    const currentFreeById = currentFree.reduce<Record<string, ContentBlock['layout']>>(
+      (acc, block) => {
+        acc[block.layout.i] = block.layout;
+        return acc;
+      },
+      {}
+    );
+    const isLayoutEqual = (a?: ContentBlock['layout'], b?: ContentBlock['layout']) => {
+      if (!a || !b) return false;
+      return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+    };
+    return items.map((block) => {
+      const savedLayout = stored[block.layout.i];
+      if (!savedLayout) return block;
+      const seedLayout = freeSeed[block.layout.i];
+      const currentLayout = currentFreeById[block.layout.i];
+      const changedInFree =
+        !seedLayout || !currentLayout ? true : !isLayoutEqual(seedLayout, currentLayout);
+      if (changedInFree) return block;
+      return {
+        ...block,
+        layout: {
+          ...block.layout,
+          ...savedLayout,
+        },
+      };
+    });
+  }, []);
 
   const handleToggleLayoutMode = useCallback(() => {
     setLayoutMode((prev) => {
       const next = prev === 'snap' ? 'free' : 'snap';
       setBlocks((current) => {
         if (next === 'free') {
-          return convertBlocksToFree(current);
+          storeSnapLayouts(current);
+          const converted = convertBlocksToFree(current);
+          storeFreeLayoutsSeed(converted);
+          return converted;
         }
         const converted = convertBlocksToSnap(current);
-        return packMasonry(converted);
+        return restoreSnapLayouts(converted, current);
       });
       return next;
     });
-  }, [convertBlocksToFree, convertBlocksToSnap, packMasonry, setBlocks]);
+  }, [convertBlocksToFree, convertBlocksToSnap, restoreSnapLayouts, setBlocks, storeFreeLayoutsSeed, storeSnapLayouts]);
+
+  useEffect(() => {
+    if (layoutMode !== 'snap') return;
+    storeSnapLayouts(blocks);
+  }, [blocks, layoutMode, storeSnapLayouts]);
 
   useEffect(() => {
     if (layoutMode === 'free') {
@@ -1007,10 +1160,37 @@ export function PageEditor({
   }, [containerWidth, layoutMode, packMasonry]);
 
   useEffect(() => {
+    if (layoutMode !== 'snap') return;
+    if (draggingBlockId) return;
+    const layoutSignature = (items: ContentBlock[]) =>
+      items
+        .map((block) => `${block.layout.i}:${block.layout.x},${block.layout.y},${block.layout.w},${block.layout.h}`)
+        .join('|');
+    const compacted = compactVertical(blocks);
+    const packed = packMasonry(compacted);
+    const prevSig = layoutSignature(blocks);
+    const nextSig = layoutSignature(packed);
+    const changed = prevSig !== nextSig;
+    if (!changed) return;
+    setBlocksTransient(packed);
+  }, [blocks, layoutMode, draggingBlockId, compactVertical, packMasonry, setBlocksTransient]);
+
+  useEffect(() => {
+    const updateFreeCanvasHeight = () => {
+      const baseHeight = typeof window !== 'undefined' ? window.innerHeight : 0;
+      setFreeCanvasHeight(Math.max(400, Math.round(baseHeight * 1.2)));
+    };
+    updateFreeCanvasHeight();
+    window.addEventListener('resize', updateFreeCanvasHeight);
+    return () => window.removeEventListener('resize', updateFreeCanvasHeight);
+  }, []);
+
+  useEffect(() => {
     if (!Object.keys(measuredSizes).length) return;
     if (layoutMode === 'free') return;
     setBlocks((prev) => {
       let changed = false;
+      const updates: { id: string; prevH: number; nextH: number }[] = [];
       const next = prev.map((block) => {
         if (block.block_type !== 'image') return block;
         const content = block.content as { url?: string };
@@ -1033,6 +1213,7 @@ export function PageEditor({
         if (block.layout.h !== newH) {
           changed = true;
           normalizedImageLayoutsRef.current.add(block.layout.i);
+          updates.push({ id: block.id, prevH: block.layout.h, nextH: newH });
           return {
             ...block,
             layout: { ...block.layout, h: newH },
@@ -1164,11 +1345,11 @@ export function PageEditor({
       });
       if (!response.ok) return;
       const data = await response.json();
-      const content = block.content as { url?: string; alt?: string; caption?: string };
+      const content = block.content as { url?: string; alt?: string; caption?: string; path?: string };
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === block.id
-            ? { ...b, content: { ...content, url: data.url } }
+            ? { ...b, content: { ...content, url: data.url, path: data.path } }
             : b
         )
       );
@@ -1377,7 +1558,7 @@ export function PageEditor({
             id: createBlockId('temp'),
             page_id: page.id,
             block_type: 'image',
-            content: { url: data.url, alt: file.name, caption: '' },
+            content: { url: data.url, path: data.path, alt: file.name, caption: '' },
             layout: {
               i: blockId,
               x: nextX,
@@ -1512,7 +1693,7 @@ export function PageEditor({
                     size="sm"
                     className="border-gray-600 text-white hover:bg-gray-800"
                   >
-                    Blocks
+                    + Blocks
                     <ChevronDown className="w-4 h-4 ml-2" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -1531,6 +1712,36 @@ export function PageEditor({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <div className="flex items-center gap-2 ml-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wide text-white/70 text-center">Grid Layout</span>
+                  <div className="inline-flex rounded-full border border-gray-700 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => layoutMode !== 'snap' && handleToggleLayoutMode()}
+                      className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
+                        layoutMode === 'snap'
+                          ? 'bg-white text-black'
+                          : 'text-white/70 hover:text-white'
+                      }`}
+                    >
+                      Snap
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => layoutMode !== 'free' && handleToggleLayoutMode()}
+                      className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
+                        layoutMode === 'free'
+                          ? 'bg-white text-black'
+                          : 'text-white/70 hover:text-white'
+                      }`}
+                    >
+                      Free
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="w-px h-6 bg-gray-700 mx-2" />
               <Button
                 onClick={handleClearBlocks}
                 variant="outline"
@@ -1547,39 +1758,6 @@ export function PageEditor({
               >
                 Delete Page
               </Button>
-              <div className="flex items-center gap-2 ml-2">
-                <span className="text-xs uppercase tracking-wide text-white/70">Grid Layout</span>
-                <div className="inline-flex rounded-full border border-gray-700 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => layoutMode !== 'snap' && handleToggleLayoutMode()}
-                    className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
-                      layoutMode === 'snap'
-                        ? 'bg-white text-black'
-                        : 'text-white/70 hover:text-white'
-                    }`}
-                  >
-                    Snap
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => layoutMode !== 'free' && handleToggleLayoutMode()}
-                    className={`px-3 py-1 text-xs uppercase tracking-wide transition-colors ${
-                      layoutMode === 'free'
-                        ? 'bg-white text-black'
-                        : 'text-white/70 hover:text-white'
-                    }`}
-                  >
-                    Free
-                  </button>
-                </div>
-              </div>
-              <div className="w-px h-6 bg-gray-700 mx-2" />
-              <Link href={`/${page.slug}`} target="_blank">
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-800">
-                  Preview
-                </Button>
-              </Link>
               {draftMode && (
                 <Button
                   onClick={handlePublish}
@@ -1647,12 +1825,15 @@ export function PageEditor({
               <div
                 className="relative w-full min-h-[400px]"
                 style={{
-                  minHeight: Math.max(
-                    400,
-                    (blocks.length
-                      ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
-                      : 1) + GRID_GAP
-                  ),
+                  minHeight:
+                    layoutMode === 'free'
+                      ? Math.max(400, freeCanvasHeight)
+                      : Math.max(
+                          400,
+                          (blocks.length
+                            ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
+                            : 1) + GRID_GAP
+                        ),
                 }}
               >
                 {blocks.map((block) => {
@@ -1756,7 +1937,13 @@ export function PageEditor({
                                 0,
                                 Math.min(data.x, Math.max(0, containerWidth - widthPx))
                               );
-                        const nextY = Math.max(0, data.y);
+                        const maxCanvasY = layoutMode === 'free'
+                          ? Math.max(0, freeCanvasHeight - heightPx)
+                          : Number.POSITIVE_INFINITY;
+                        const nextY =
+                          layoutMode === 'free'
+                            ? Math.max(0, Math.min(data.y, maxCanvasY))
+                            : Math.max(0, data.y);
                         setBlocks((prev) => {
                           const next = prev.map((b) =>
                             b.id === block.id
@@ -1807,7 +1994,13 @@ export function PageEditor({
                           nextW = GRID_COLS;
                           nextX = 0;
                         }
-                        const nextY = Math.max(0, position.y);
+                        const maxCanvasY = layoutMode === 'free'
+                          ? Math.max(0, freeCanvasHeight - nextH)
+                          : Number.POSITIVE_INFINITY;
+                        const nextY =
+                          layoutMode === 'free'
+                            ? Math.max(0, Math.min(position.y, maxCanvasY))
+                            : Math.max(0, position.y);
 
                         setBlocks((prev) => {
                           // Apply resize to the block

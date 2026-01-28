@@ -21,6 +21,7 @@ export interface ContentBlock {
 
 export interface ImageContent {
   url: string;
+  path?: string;
   alt?: string;
   caption?: string;
 }
