@@ -321,14 +321,15 @@ export function PageEditor({
       for (const entry of entries) {
         const id = textBlockIdsByElRef.current.get(entry.target);
         if (!id) continue;
-        const height = Math.round((entry.target as HTMLElement).offsetHeight);
+        // Add 8px buffer to ensure descenders and line-height aren't cut off
+        const height = Math.round((entry.target as HTMLElement).offsetHeight) + 8;
         updates.set(id, height);
       }
       if (updates.size === 0) return;
       setBlocksTransient((prev) => {
         let changed = false;
         const next = prev.map((block) => {
-          if (block.block_type !== 'text') return block;
+          if (block.block_type !== 'text' && (block.block_type as string) !== 'header') return block;
           const nextH = updates.get(block.id);
           if (!nextH || Math.abs(block.layout.h - nextH) < 1) return block;
           changed = true;
@@ -1236,7 +1237,7 @@ export function PageEditor({
     const blockW = 2;
     // Text blocks use content height + 5rem padding (measured later), others use aspect ratio
     const blockH =
-      type === 'text' || type === 'header'
+      type === 'text'
         ? 160 // Initial height, will be auto-measured
         : type === 'vimeo'
           ? ratioToPxH(blockW, 16 / 9, containerWidth)
@@ -1386,6 +1387,29 @@ export function PageEditor({
     );
   }, []);
 
+  const handleSetBlockWidth = useCallback((blockId: string, newWidth: number) => {
+    if (layoutMode !== 'snap') return;
+    setBlocks((prev) => {
+      const updated = prev.map((block) => {
+        if (block.id !== blockId) return block;
+        const ratio = getRatioForBlock(block);
+        const newH = ratio ? ratioToPxH(newWidth, ratio, containerWidth) : block.layout.h;
+        // Center the block if it's full width, otherwise keep x position valid
+        const newX = newWidth === GRID_COLS ? 0 : Math.min(block.layout.x, GRID_COLS - newWidth);
+        return {
+          ...block,
+          layout: {
+            ...block.layout,
+            w: newWidth,
+            h: newH,
+            x: newX,
+          },
+        };
+      });
+      return packMasonry(updated);
+    });
+  }, [layoutMode, containerWidth, getRatioForBlock, packMasonry, setBlocks]);
+
   const handleUpdateVimeoField = useCallback(
     (blockId: string, field: 'vimeo_id' | 'title' | 'caption', value: string) => {
       setBlocks((prev) =>
@@ -1405,25 +1429,12 @@ export function PageEditor({
     []
   );
 
-  const handleUpdateHeaderField = useCallback((blockId: string, content: { header: string; description: string }) => {
-    setBlocks((prev) =>
-      prev.map((block) => {
-        if (block.id !== blockId || block.block_type !== 'header') return block;
-        return {
-          ...block,
-          content: {
-            header: content.header,
-            description: content.description,
-          },
-        };
-      })
-    );
-  }, []);
-
   const handleUpdateTextField = useCallback((blockId: string, content: { header: string; description: string }) => {
     setBlocks((prev) =>
       prev.map((block) => {
-        if (block.id !== blockId || block.block_type !== 'text') return block;
+        if (block.id !== blockId) return block;
+        // Handle both 'text' and legacy 'header' blocks
+        if (block.block_type !== 'text' && (block.block_type as string) !== 'header') return block;
         return {
           ...block,
           content: {
@@ -1698,9 +1709,6 @@ export function PageEditor({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-black text-white border-white/10">
-                  <DropdownMenuItem onClick={() => handleAddBlock('header')}>
-                    Header & Description
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleAddBlock('image')}>
                     Image
                   </DropdownMenuItem>
@@ -1830,6 +1838,8 @@ export function PageEditor({
                       ? Math.max(400, freeCanvasHeight)
                       : Math.max(
                           400,
+                          // Ensure enough height for full-width aspect-ratio blocks (16:9 vimeo at 4 cols)
+                          ratioToPxH(GRID_COLS, 16 / 9, containerWidth) + 100,
                           (blocks.length
                             ? Math.max(...blocks.map((b) => b.layout.y + getBlockHeightPx(b)))
                             : 1) + GRID_GAP
@@ -1860,11 +1870,45 @@ export function PageEditor({
                       lockAspectRatio={ratio ?? false}
                       resizeHandleWrapperStyle={{ zIndex: 80 }}
                       resizeHandleStyles={{
-                        right: { width: '12px', right: '-6px' },
-                        left: { width: '12px', left: '-6px' },
-                        bottom: { height: '12px', bottom: '-6px' },
-                        bottomRight: { width: '14px', height: '14px', right: '-7px', bottom: '-7px' },
-                        bottomLeft: { width: '14px', height: '14px', left: '-7px', bottom: '-7px' },
+                        right: { 
+                          width: '12px', 
+                          right: '-6px',
+                          cursor: 'ew-resize',
+                          background: 'rgba(255,255,255,0.3)',
+                          borderRadius: '2px',
+                        },
+                        left: { 
+                          width: '12px', 
+                          left: '-6px',
+                          cursor: 'ew-resize',
+                          background: 'rgba(255,255,255,0.3)',
+                          borderRadius: '2px',
+                        },
+                        bottom: { 
+                          height: '12px', 
+                          bottom: '-6px',
+                          cursor: 'ns-resize',
+                          background: 'rgba(255,255,255,0.3)',
+                          borderRadius: '2px',
+                        },
+                        bottomRight: { 
+                          width: '16px', 
+                          height: '16px', 
+                          right: '-8px', 
+                          bottom: '-8px',
+                          cursor: 'nwse-resize',
+                          background: 'rgba(255,255,255,0.5)',
+                          borderRadius: '4px',
+                        },
+                        bottomLeft: { 
+                          width: '16px', 
+                          height: '16px', 
+                          left: '-8px', 
+                          bottom: '-8px',
+                          cursor: 'nesw-resize',
+                          background: 'rgba(255,255,255,0.5)',
+                          borderRadius: '4px',
+                        },
                       }}
                       style={{
                         zIndex:
@@ -1900,16 +1944,28 @@ export function PageEditor({
                       }
                       enableResizing={
                         !readOnly && showEditControls && !isSingleColumn
-                          ? {
-                              top: false,
-                              right: true,
-                              bottom: block.block_type !== 'text',
-                              left: true,
-                              topRight: false,
-                              bottomRight: true,
-                              bottomLeft: true,
-                              topLeft: false,
-                            }
+                          ? block.block_type === 'text' || (block.block_type as string) === 'header'
+                            ? {
+                                // Text blocks: width only, height is auto-measured from content
+                                top: false,
+                                right: true,
+                                bottom: false,
+                                left: true,
+                                topRight: false,
+                                bottomRight: false,
+                                bottomLeft: false,
+                                topLeft: false,
+                              }
+                            : {
+                                top: false,
+                                right: true,
+                                bottom: true,
+                                left: true,
+                                topRight: false,
+                                bottomRight: true,
+                                bottomLeft: true,
+                                topLeft: false,
+                              }
                           : false
                       }
                       disableDragging={readOnly || !showEditControls}
@@ -2028,7 +2084,11 @@ export function PageEditor({
                     >
                       <div
                         dir="ltr"
-                        className={`relative rounded-lg overflow-hidden group w-full h-full ${
+                        className={`relative rounded-lg group w-full h-full ${
+                          block.block_type === 'text' || (block.block_type as string) === 'header' 
+                            ? 'overflow-visible' 
+                            : 'overflow-hidden'
+                        } ${
                           block.block_type === 'vimeo' ? 'bg-black' : 'bg-gray-100'
                         } ${!readOnly && showEditControls ? 'cursor-move' : ''}`}
                         onDragOver={(event) => {
@@ -2049,9 +2109,8 @@ export function PageEditor({
                         <BlockRenderer
                           block={block}
                           isEditing={!readOnly && showEditControls}
-                          onHeaderChange={handleUpdateHeaderField}
                           onTextChange={handleUpdateTextField}
-                          textMeasureRef={block.block_type === 'text' ? setTextBlockRef(block.id) : undefined}
+                          textMeasureRef={block.block_type === 'text' || (block.block_type as string) === 'header' ? setTextBlockRef(block.id) : undefined}
                         />
                         {!readOnly && showEditControls && (
                           <>
@@ -2102,28 +2161,53 @@ export function PageEditor({
                               </div>
                             ) : block.block_type === 'image' ? (
                               <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex flex-col gap-2 pointer-events-none">
-                                <div className="flex gap-2 pointer-events-auto justify-end">
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSelectExisting(block);
-                                    }}
-                                    className="bg-white text-black hover:bg-gray-100"
-                                  >
-                                    Existing
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteBlock(block.id);
-                                    }}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                <div className="flex gap-2 pointer-events-auto justify-between items-center">
+                                  {/* Column width buttons */}
+                                  {layoutMode === 'snap' && (
+                                    <div className="flex gap-1">
+                                      {[1, 2, 3, 4].map((w) => (
+                                        <button
+                                          key={w}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSetBlockWidth(block.id, w);
+                                          }}
+                                          onMouseDown={(e) => e.stopPropagation()}
+                                          className={`w-7 h-7 text-xs font-medium rounded transition-colors ${
+                                            block.layout.w === w
+                                              ? 'bg-white text-black'
+                                              : 'bg-white/20 text-white hover:bg-white/40'
+                                          }`}
+                                        >
+                                          {w}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSelectExisting(block);
+                                      }}
+                                      className="bg-white text-black hover:bg-gray-100"
+                                    >
+                                      Existing
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteBlock(block.id);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
                                 </div>
                                 <div className="flex flex-col gap-2 pointer-events-auto">
                                   <input
@@ -2162,22 +2246,7 @@ export function PageEditor({
                                   />
                                 </div>
                               </div>
-                            ) : block.block_type === 'header' ? (
-                              <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
-                                <div className="flex gap-2 pointer-events-auto">
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteBlock(block.id);
-                                    }}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : block.block_type === 'text' ? (
+                            ) : block.block_type === 'text' || (block.block_type as string) === 'header' ? (
                               <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-3 py-2 flex justify-end pointer-events-none">
                                 <div className="flex gap-2 pointer-events-auto">
                                   <Button

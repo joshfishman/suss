@@ -2,16 +2,14 @@
 
 import type { Ref } from 'react';
 
-import { ContentBlock, HeaderContent, ImageContent, VimeoContent, TextContent } from '@/lib/types/content';
+import { ContentBlock, ImageContent, VimeoContent, TextContent } from '@/lib/types/content';
 import { ImageBlock } from './image-block';
 import { VimeoBlock } from './vimeo-block';
 import { TextBlock } from './text-block';
-import { HeaderBlock } from './header-block';
 
 interface BlockRendererProps {
   block: ContentBlock;
   isEditing?: boolean;
-  onHeaderChange?: (blockId: string, content: HeaderContent) => void;
   onTextChange?: (blockId: string, content: TextContent) => void;
   textMeasureRef?: Ref<HTMLDivElement>;
 }
@@ -19,7 +17,6 @@ interface BlockRendererProps {
 export function BlockRenderer({
   block,
   isEditing = false,
-  onHeaderChange,
   onTextChange,
   textMeasureRef,
 }: BlockRendererProps) {
@@ -29,6 +26,8 @@ export function BlockRenderer({
     case 'vimeo':
       return <VimeoBlock content={block.content as VimeoContent} isEditing={isEditing} />;
     case 'text':
+    default:
+      // Treat 'text' and any legacy 'header' blocks as text
       return (
         <TextBlock
           content={block.content as TextContent}
@@ -37,15 +36,5 @@ export function BlockRenderer({
           measureRef={textMeasureRef}
         />
       );
-    case 'header':
-      return (
-        <HeaderBlock
-          content={block.content as HeaderContent}
-          isEditing={isEditing}
-          onChange={(content) => onHeaderChange?.(block.id, content)}
-        />
-      );
-    default:
-      return null;
   }
 }
